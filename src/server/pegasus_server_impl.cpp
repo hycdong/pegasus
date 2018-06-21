@@ -1024,10 +1024,11 @@ void pegasus_server_impl::on_ttl(const ::dsn::blob &key,
     std::string value;
     rocksdb::Status status = _db->Get(_rd_opts, skey, &value);
 
-    uint32_t expire_ts;
+    uint32_t expire_ts = 0;
     uint32_t now_ts = ::pegasus::utils::epoch_now();
     if (status.ok()) {
-        if (check_if_record_expired(now_ts, value)) {
+        expire_ts = pegasus_extract_expire_ts(_value_schema_version, value);
+        if (check_if_ts_expired(now_ts, expire_ts)) {
             _pfc_recent_expire_count->increment();
             if (_verbose_log) {
                 derror("%s: rocksdb data expired for ttl from %s",
@@ -2418,6 +2419,7 @@ uint64_t pegasus_server_impl::do_manual_compact(const rocksdb::CompactRangeOptio
                    status.ToString().c_str(),
                    dsn_now_ms() - start_time);
 
+    // do compact
     ddebug_replica("start to CompactRange, target_level = {}, bottommost_level_compaction = {}",
                    options.target_level,
                    options.bottommost_level_compaction == rocksdb::BottommostLevelCompaction::kForce
@@ -2428,6 +2430,9 @@ uint64_t pegasus_server_impl::do_manual_compact(const rocksdb::CompactRangeOptio
     ddebug_replica("CompactRange finished, status = {}, time_used = {}ms",
                    status.ToString().c_str(),
                    dsn_now_ms() - start_time);
+
+    // update size immediately
+    updating_rocksdb_sstsize();
 
     return _db->GetLastManualCompactFinishTime();
 }

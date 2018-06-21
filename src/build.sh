@@ -5,6 +5,8 @@
 #    PART_CLEAR     YES|NO
 #    JOB_NUM        <num>
 #    BUILD_TYPE     debug|release
+#    C_COMPILER     <str>
+#    CXX_COMPILER   <str>
 #    RUN_VERBOSE    YES|NO
 #    WARNING_ALL    YES|NO
 #    ENABLE_GCOV    YES|NO
@@ -12,8 +14,8 @@
 #    TEST_MODULE    "<module1> <module2> ..."
 #
 # CMake options:
-#    -DCMAKE_C_COMPILER=gcc
-#    -DCMAKE_CXX_COMPILER=g++
+#    -DCMAKE_C_COMPILER=gcc|clang
+#    -DCMAKE_CXX_COMPILER=g++|clang++
 #    [-DCMAKE_BUILD_TYPE=Debug]
 #    [-DWARNING_ALL=TRUE]
 #    [-DENABLE_GCOV=TRUE]
@@ -21,8 +23,15 @@
 
 ROOT=`pwd`
 BUILD_DIR="$ROOT/builder"
-CMAKE_OPTIONS="$CMAKE_OPTIONS -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++"
-MAKE_OPTIONS="$MAKE_OPTIONS"
+
+echo "DSN_ROOT=$DSN_ROOT"
+echo "DSN_THIRDPARTY_ROOT=$DSN_THIRDPARTY_ROOT"
+echo "C_COMPILER=$C_COMPILER"
+echo "CXX_COMPILER=$CXX_COMPILER"
+CMAKE_OPTIONS="$CMAKE_OPTIONS -DCMAKE_C_COMPILER=$C_COMPILER -DCMAKE_CXX_COMPILER=$CXX_COMPILER"
+
+echo "JOB_NUM=$JOB_NUM"
+MAKE_OPTIONS="$MAKE_OPTIONS -j$JOB_NUM"
 
 if [ "$CLEAR" == "YES" ]
 then
@@ -36,15 +45,6 @@ then
     echo "PART_CLEAR=YES"
 else
     echo "PART_CLEAR=NO"
-fi
-
-if [ -n "$JOB_NUM" ]
-then
-    echo "JOB_NUM=$JOB_NUM"
-    MAKE_OPTIONS="$MAKE_OPTIONS -j$JOB_NUM"
-else
-    echo "JOB_NUM=8"
-    MAKE_OPTIONS="$MAKE_OPTIONS -j8"
 fi
 
 if [ "$BUILD_TYPE" == "debug" ]
@@ -128,7 +128,19 @@ then
     rm -f ../rocksdb/pegasus_bench
 fi
 
-make -C ../rocksdb static_lib_$BUILD_TYPE $MAKE_OPTIONS
+# use ccache if possible
+if [ `command -v ccache` ]
+then
+    ROCKSDB_CC="ccache $C_COMPILER"
+    ROCKSDB_CXX="ccache $CXX_COMPILER"
+else
+    ROCKSDB_CC="$C_COMPILER"
+    ROCKSDB_CXX="$CXX_COMPILER"
+fi
+
+echo "ROCKDB_CC=$ROCKSDB_CC"
+echo "ROCKSDB_CXX=$ROCKSDB_CXX"
+CC=$ROCKSDB_CC CXX=$ROCKSDB_CXX make -C ../rocksdb static_lib_$BUILD_TYPE $MAKE_OPTIONS
 if [ $? -ne 0 ]
 then
     echo "ERROR: build librocksdb.a failed"

@@ -18,7 +18,6 @@ set(MY_PROJ_LIBS
     dsn.replication.clientlib
     fmt
     )
-add_compile_options("-Wno-fpermissive")
 set(MY_BINPLACES "${CMAKE_CURRENT_SOURCE_DIR}/config.ini")
 
 set(MY_BOOST_PACKAGES system filesystem)
