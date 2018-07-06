@@ -140,6 +140,9 @@ public:
     storage_apply_checkpoint(chkpt_apply_mode mode,
                              const dsn::replication::learn_state &state) override;
 
+    //
+    virtual void set_partition_version(uint32_t partition_version) override;
+
     virtual int64_t last_durable_decree() const override { return _last_durable_decree.load(); }
 
     virtual int64_t last_flushed_decree() const override { return _db->GetLastFlushedDecree(); }
@@ -268,6 +271,8 @@ private:
     uint32_t _updating_rocksdb_sstsize_interval_seconds;
 
     pegasus_manual_compact_service _manual_compact_svc;
+
+    std::atomic<uint32_t> _partition_version; // TODO(hyc): init it
 
     dsn::task_tracker _tracker;
 

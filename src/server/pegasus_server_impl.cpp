@@ -2442,5 +2442,19 @@ std::string pegasus_server_impl::query_compact_state() const
     return _manual_compact_svc.query_compact_state();
 }
 
+void pegasus_server_impl::set_partition_version(uint32_t partition_version)
+{
+    ddebug("partition version of %d.%d from %u to %u",
+           _gpid.get_app_id(),
+           _gpid.get_partition_index(),
+           _partition_version.load(),
+           partition_version);
+    dassert(partition_version >= _partition_version, "");
+
+    _partition_version.store(partition_version);
+
+    // TODO(hyc): add filter handler
+}
+
 } // namespace server
 } // namespace pegasus
