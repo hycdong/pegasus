@@ -132,7 +132,11 @@ pegasus_restore_key(const ::dsn::blob &key, std::string &hash_key, std::string &
 }
 
 // calculate hash from rocksdb key.
-inline uint64_t pegasus_key_hash(const ::dsn::blob &key)
+// TODO(hyc): consider difference between original dsn::blob type and template
+// original function use key.buffer_ptr() to calculate crc64_calc, what's the usage of offset?
+// if there will bring in error???
+template <typename T>
+inline uint64_t pegasus_key_hash(const T &key)
 {
     dassert(key.length() >= 2, "key length must be no less than 2");
 
@@ -143,10 +147,10 @@ inline uint64_t pegasus_key_hash(const ::dsn::blob &key)
         // hash_key_len > 0, compute hash from hash_key
         dassert(key.length() >= 2 + hash_key_len,
                 "key length must be no less than (2 + hash_key_len)");
-        return dsn::utils::crc64_calc(key.buffer_ptr() + 2, hash_key_len, 0);
+        return dsn::utils::crc64_calc(key.data() + 2, hash_key_len, 0);
     } else {
         // hash_key_len == 0, compute hash from sort_key
-        return dsn::utils::crc64_calc(key.buffer_ptr() + 2, key.length() - 2, 0);
+        return dsn::utils::crc64_calc(key.data() + 2, key.length() - 2, 0);
     }
 }
 

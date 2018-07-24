@@ -53,7 +53,8 @@ pegasus_server_impl::pegasus_server_impl(dsn::replication::replica *r)
       _value_schema_version(0),
       _last_durable_decree(0),
       _is_checkpointing(false),
-      _manual_compact_svc(this)
+      _manual_compact_svc(this),
+      _partition_version(0)
 {
     _primary_address = dsn::rpc_address(dsn_primary_address()).to_string();
     _gpid = get_gpid();
@@ -1485,6 +1486,7 @@ void pegasus_server_impl::on_clear_scanner(const int64_t &args) { _context_cache
 
         // only enable filter after correct value_schema_version set
         _key_ttl_compaction_filter.SetValueSchemaVersion(_value_schema_version);
+        _key_ttl_compaction_filter.SetPartitionId(_gpid.get_partition_index());
         _key_ttl_compaction_filter.EnableFilter();
 
         // update LastManualCompactFinishTime
@@ -2452,8 +2454,7 @@ void pegasus_server_impl::set_partition_version(uint32_t partition_version)
     dassert(partition_version >= _partition_version, "");
 
     _partition_version.store(partition_version);
-
-    // TODO(hyc): add filter handler
+    _key_ttl_compaction_filter.SetPartitionVersion(partition_version);
 }
 
 } // namespace server

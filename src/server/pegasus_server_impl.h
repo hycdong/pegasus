@@ -272,7 +272,7 @@ private:
 
     pegasus_manual_compact_service _manual_compact_svc;
 
-    std::atomic<uint32_t> _partition_version; // TODO(hyc): init it
+    std::atomic<uint32_t> _partition_version;
 
     dsn::task_tracker _tracker;
 
