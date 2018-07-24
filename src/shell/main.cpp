@@ -339,6 +339,12 @@ static command_executor commands[] = {
         "clear_app_envs", "clear current app envs", "<-a|--all> <-p|--prefix str>", clear_app_envs,
     },
     {
+        "partition_split",
+        "split partitions of app",
+        "<app_name> <new_partition_count>",
+        app_partition_split,
+    },
+    {
         "exit", "exit shell", "", exit_shell,
     },
     {

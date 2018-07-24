@@ -3803,3 +3803,23 @@ inline bool clear_app_envs(command_executor *e, shell_context *sc, arguments arg
     }
     return true;
 }
+
+inline bool app_partition_split(command_executor *e, shell_context *sc, arguments args)
+{
+    if (args.argc < 3)
+        return false;
+
+    std::string app_name = args.argv[1];
+    int partition_count = atoi(args.argv[2]);
+    if (partition_count <= 0) {
+        fprintf(stderr, "new partition count should be positive integer");
+        return false;
+    }
+
+    ::dsn::error_code err = sc->ddl_client->app_partition_split(app_name, partition_count);
+    if (err == ::dsn::ERR_OK)
+        std::cout << "split app " << app_name << " succeed" << std::endl;
+    else
+        std::cout << "split app " << app_name << " failed, error=" << err.to_string() << std::endl;
+    return true;
+}
