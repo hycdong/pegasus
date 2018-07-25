@@ -11,2794 +11,2849 @@
 
 #include <thrift/TToString.h>
 
-namespace dsn {
-namespace apps {
+namespace dsn { namespace apps {
 
-int _kfilter_typeValues[] = {filter_type::FT_NO_FILTER,
-                             filter_type::FT_MATCH_ANYWHERE,
-                             filter_type::FT_MATCH_PREFIX,
-                             filter_type::FT_MATCH_POSTFIX};
-const char *_kfilter_typeNames[] = {
-    "FT_NO_FILTER", "FT_MATCH_ANYWHERE", "FT_MATCH_PREFIX", "FT_MATCH_POSTFIX"};
-const std::map<int, const char *> _filter_type_VALUES_TO_NAMES(
-    ::apache::thrift::TEnumIterator(4, _kfilter_typeValues, _kfilter_typeNames),
-    ::apache::thrift::TEnumIterator(-1, NULL, NULL));
+int _kfilter_typeValues[] = {
+  filter_type::FT_NO_FILTER,
+  filter_type::FT_MATCH_ANYWHERE,
+  filter_type::FT_MATCH_PREFIX,
+  filter_type::FT_MATCH_POSTFIX
+};
+const char* _kfilter_typeNames[] = {
+  "FT_NO_FILTER",
+  "FT_MATCH_ANYWHERE",
+  "FT_MATCH_PREFIX",
+  "FT_MATCH_POSTFIX"
+};
+const std::map<int, const char*> _filter_type_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(4, _kfilter_typeValues, _kfilter_typeNames), ::apache::thrift::TEnumIterator(-1, NULL, NULL));
 
-update_request::~update_request() throw() {}
 
-void update_request::__set_key(const ::dsn::blob &val) { this->key = val; }
+update_request::~update_request() throw() {
+}
 
-void update_request::__set_value(const ::dsn::blob &val) { this->value = val; }
 
-void update_request::__set_expire_ts_seconds(const int32_t val) { this->expire_ts_seconds = val; }
+void update_request::__set_key(const  ::dsn::blob& val) {
+  this->key = val;
+}
 
-uint32_t update_request::read(::apache::thrift::protocol::TProtocol *iprot)
-{
+void update_request::__set_value(const  ::dsn::blob& val) {
+  this->value = val;
+}
 
-    apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+void update_request::__set_expire_ts_seconds(const int32_t val) {
+  this->expire_ts_seconds = val;
+}
 
-    xfer += iprot->readStructBegin(fname);
+uint32_t update_request::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    using ::apache::thrift::protocol::TProtocolException;
+  apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-        case 1:
-            if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                xfer += this->key.read(iprot);
-                this->__isset.key = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 2:
-            if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                xfer += this->value.read(iprot);
-                this->__isset.value = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 3:
-            if (ftype == ::apache::thrift::protocol::T_I32) {
-                xfer += iprot->readI32(this->expire_ts_seconds);
-                this->__isset.expire_ts_seconds = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        default:
-            xfer += iprot->skip(ftype);
-            break;
-        }
-        xfer += iprot->readFieldEnd();
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
     }
-
-    xfer += iprot->readStructEnd();
-
-    return xfer;
-}
-
-uint32_t update_request::write(::apache::thrift::protocol::TProtocol *oprot) const
-{
-    uint32_t xfer = 0;
-    apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("update_request");
-
-    xfer += oprot->writeFieldBegin("key", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->key.write(oprot);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("value", ::apache::thrift::protocol::T_STRUCT, 2);
-    xfer += this->value.write(oprot);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("expire_ts_seconds", ::apache::thrift::protocol::T_I32, 3);
-    xfer += oprot->writeI32(this->expire_ts_seconds);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
-}
-
-void swap(update_request &a, update_request &b)
-{
-    using ::std::swap;
-    swap(a.key, b.key);
-    swap(a.value, b.value);
-    swap(a.expire_ts_seconds, b.expire_ts_seconds);
-    swap(a.__isset, b.__isset);
-}
-
-update_request::update_request(const update_request &other0)
-{
-    key = other0.key;
-    value = other0.value;
-    expire_ts_seconds = other0.expire_ts_seconds;
-    __isset = other0.__isset;
-}
-update_request::update_request(update_request &&other1)
-{
-    key = std::move(other1.key);
-    value = std::move(other1.value);
-    expire_ts_seconds = std::move(other1.expire_ts_seconds);
-    __isset = std::move(other1.__isset);
-}
-update_request &update_request::operator=(const update_request &other2)
-{
-    key = other2.key;
-    value = other2.value;
-    expire_ts_seconds = other2.expire_ts_seconds;
-    __isset = other2.__isset;
-    return *this;
-}
-update_request &update_request::operator=(update_request &&other3)
-{
-    key = std::move(other3.key);
-    value = std::move(other3.value);
-    expire_ts_seconds = std::move(other3.expire_ts_seconds);
-    __isset = std::move(other3.__isset);
-    return *this;
-}
-void update_request::printTo(std::ostream &out) const
-{
-    using ::apache::thrift::to_string;
-    out << "update_request(";
-    out << "key=" << to_string(key);
-    out << ", "
-        << "value=" << to_string(value);
-    out << ", "
-        << "expire_ts_seconds=" << to_string(expire_ts_seconds);
-    out << ")";
-}
-
-update_response::~update_response() throw() {}
-
-void update_response::__set_error(const int32_t val) { this->error = val; }
-
-void update_response::__set_app_id(const int32_t val) { this->app_id = val; }
-
-void update_response::__set_partition_index(const int32_t val) { this->partition_index = val; }
-
-void update_response::__set_decree(const int64_t val) { this->decree = val; }
-
-void update_response::__set_server(const std::string &val) { this->server = val; }
-
-uint32_t update_response::read(::apache::thrift::protocol::TProtocol *iprot)
-{
-
-    apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
-
-    xfer += iprot->readStructBegin(fname);
-
-    using ::apache::thrift::protocol::TProtocolException;
-
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-        case 1:
-            if (ftype == ::apache::thrift::protocol::T_I32) {
-                xfer += iprot->readI32(this->error);
-                this->__isset.error = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 2:
-            if (ftype == ::apache::thrift::protocol::T_I32) {
-                xfer += iprot->readI32(this->app_id);
-                this->__isset.app_id = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 3:
-            if (ftype == ::apache::thrift::protocol::T_I32) {
-                xfer += iprot->readI32(this->partition_index);
-                this->__isset.partition_index = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 4:
-            if (ftype == ::apache::thrift::protocol::T_I64) {
-                xfer += iprot->readI64(this->decree);
-                this->__isset.decree = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 5:
-            if (ftype == ::apache::thrift::protocol::T_STRING) {
-                xfer += iprot->readString(this->server);
-                this->__isset.server = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        default:
-            xfer += iprot->skip(ftype);
-            break;
-        }
-        xfer += iprot->readFieldEnd();
-    }
-
-    xfer += iprot->readStructEnd();
-
-    return xfer;
-}
-
-uint32_t update_response::write(::apache::thrift::protocol::TProtocol *oprot) const
-{
-    uint32_t xfer = 0;
-    apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("update_response");
-
-    xfer += oprot->writeFieldBegin("error", ::apache::thrift::protocol::T_I32, 1);
-    xfer += oprot->writeI32(this->error);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("app_id", ::apache::thrift::protocol::T_I32, 2);
-    xfer += oprot->writeI32(this->app_id);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("partition_index", ::apache::thrift::protocol::T_I32, 3);
-    xfer += oprot->writeI32(this->partition_index);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("decree", ::apache::thrift::protocol::T_I64, 4);
-    xfer += oprot->writeI64(this->decree);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("server", ::apache::thrift::protocol::T_STRING, 5);
-    xfer += oprot->writeString(this->server);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
-}
-
-void swap(update_response &a, update_response &b)
-{
-    using ::std::swap;
-    swap(a.error, b.error);
-    swap(a.app_id, b.app_id);
-    swap(a.partition_index, b.partition_index);
-    swap(a.decree, b.decree);
-    swap(a.server, b.server);
-    swap(a.__isset, b.__isset);
-}
-
-update_response::update_response(const update_response &other4)
-{
-    error = other4.error;
-    app_id = other4.app_id;
-    partition_index = other4.partition_index;
-    decree = other4.decree;
-    server = other4.server;
-    __isset = other4.__isset;
-}
-update_response::update_response(update_response &&other5)
-{
-    error = std::move(other5.error);
-    app_id = std::move(other5.app_id);
-    partition_index = std::move(other5.partition_index);
-    decree = std::move(other5.decree);
-    server = std::move(other5.server);
-    __isset = std::move(other5.__isset);
-}
-update_response &update_response::operator=(const update_response &other6)
-{
-    error = other6.error;
-    app_id = other6.app_id;
-    partition_index = other6.partition_index;
-    decree = other6.decree;
-    server = other6.server;
-    __isset = other6.__isset;
-    return *this;
-}
-update_response &update_response::operator=(update_response &&other7)
-{
-    error = std::move(other7.error);
-    app_id = std::move(other7.app_id);
-    partition_index = std::move(other7.partition_index);
-    decree = std::move(other7.decree);
-    server = std::move(other7.server);
-    __isset = std::move(other7.__isset);
-    return *this;
-}
-void update_response::printTo(std::ostream &out) const
-{
-    using ::apache::thrift::to_string;
-    out << "update_response(";
-    out << "error=" << to_string(error);
-    out << ", "
-        << "app_id=" << to_string(app_id);
-    out << ", "
-        << "partition_index=" << to_string(partition_index);
-    out << ", "
-        << "decree=" << to_string(decree);
-    out << ", "
-        << "server=" << to_string(server);
-    out << ")";
-}
-
-read_response::~read_response() throw() {}
-
-void read_response::__set_error(const int32_t val) { this->error = val; }
-
-void read_response::__set_value(const ::dsn::blob &val) { this->value = val; }
-
-void read_response::__set_app_id(const int32_t val) { this->app_id = val; }
-
-void read_response::__set_partition_index(const int32_t val) { this->partition_index = val; }
-
-void read_response::__set_server(const std::string &val) { this->server = val; }
-
-uint32_t read_response::read(::apache::thrift::protocol::TProtocol *iprot)
-{
-
-    apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
-
-    xfer += iprot->readStructBegin(fname);
-
-    using ::apache::thrift::protocol::TProtocolException;
-
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-        case 1:
-            if (ftype == ::apache::thrift::protocol::T_I32) {
-                xfer += iprot->readI32(this->error);
-                this->__isset.error = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 2:
-            if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                xfer += this->value.read(iprot);
-                this->__isset.value = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 3:
-            if (ftype == ::apache::thrift::protocol::T_I32) {
-                xfer += iprot->readI32(this->app_id);
-                this->__isset.app_id = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 4:
-            if (ftype == ::apache::thrift::protocol::T_I32) {
-                xfer += iprot->readI32(this->partition_index);
-                this->__isset.partition_index = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 6:
-            if (ftype == ::apache::thrift::protocol::T_STRING) {
-                xfer += iprot->readString(this->server);
-                this->__isset.server = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        default:
-            xfer += iprot->skip(ftype);
-            break;
-        }
-        xfer += iprot->readFieldEnd();
-    }
-
-    xfer += iprot->readStructEnd();
-
-    return xfer;
-}
-
-uint32_t read_response::write(::apache::thrift::protocol::TProtocol *oprot) const
-{
-    uint32_t xfer = 0;
-    apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("read_response");
-
-    xfer += oprot->writeFieldBegin("error", ::apache::thrift::protocol::T_I32, 1);
-    xfer += oprot->writeI32(this->error);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("value", ::apache::thrift::protocol::T_STRUCT, 2);
-    xfer += this->value.write(oprot);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("app_id", ::apache::thrift::protocol::T_I32, 3);
-    xfer += oprot->writeI32(this->app_id);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("partition_index", ::apache::thrift::protocol::T_I32, 4);
-    xfer += oprot->writeI32(this->partition_index);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("server", ::apache::thrift::protocol::T_STRING, 6);
-    xfer += oprot->writeString(this->server);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
-}
-
-void swap(read_response &a, read_response &b)
-{
-    using ::std::swap;
-    swap(a.error, b.error);
-    swap(a.value, b.value);
-    swap(a.app_id, b.app_id);
-    swap(a.partition_index, b.partition_index);
-    swap(a.server, b.server);
-    swap(a.__isset, b.__isset);
-}
-
-read_response::read_response(const read_response &other8)
-{
-    error = other8.error;
-    value = other8.value;
-    app_id = other8.app_id;
-    partition_index = other8.partition_index;
-    server = other8.server;
-    __isset = other8.__isset;
-}
-read_response::read_response(read_response &&other9)
-{
-    error = std::move(other9.error);
-    value = std::move(other9.value);
-    app_id = std::move(other9.app_id);
-    partition_index = std::move(other9.partition_index);
-    server = std::move(other9.server);
-    __isset = std::move(other9.__isset);
-}
-read_response &read_response::operator=(const read_response &other10)
-{
-    error = other10.error;
-    value = other10.value;
-    app_id = other10.app_id;
-    partition_index = other10.partition_index;
-    server = other10.server;
-    __isset = other10.__isset;
-    return *this;
-}
-read_response &read_response::operator=(read_response &&other11)
-{
-    error = std::move(other11.error);
-    value = std::move(other11.value);
-    app_id = std::move(other11.app_id);
-    partition_index = std::move(other11.partition_index);
-    server = std::move(other11.server);
-    __isset = std::move(other11.__isset);
-    return *this;
-}
-void read_response::printTo(std::ostream &out) const
-{
-    using ::apache::thrift::to_string;
-    out << "read_response(";
-    out << "error=" << to_string(error);
-    out << ", "
-        << "value=" << to_string(value);
-    out << ", "
-        << "app_id=" << to_string(app_id);
-    out << ", "
-        << "partition_index=" << to_string(partition_index);
-    out << ", "
-        << "server=" << to_string(server);
-    out << ")";
-}
-
-ttl_response::~ttl_response() throw() {}
-
-void ttl_response::__set_error(const int32_t val) { this->error = val; }
-
-void ttl_response::__set_ttl_seconds(const int32_t val) { this->ttl_seconds = val; }
-
-void ttl_response::__set_app_id(const int32_t val) { this->app_id = val; }
-
-void ttl_response::__set_partition_index(const int32_t val) { this->partition_index = val; }
-
-void ttl_response::__set_server(const std::string &val) { this->server = val; }
-
-uint32_t ttl_response::read(::apache::thrift::protocol::TProtocol *iprot)
-{
-
-    apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
-
-    xfer += iprot->readStructBegin(fname);
-
-    using ::apache::thrift::protocol::TProtocolException;
-
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-        case 1:
-            if (ftype == ::apache::thrift::protocol::T_I32) {
-                xfer += iprot->readI32(this->error);
-                this->__isset.error = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 2:
-            if (ftype == ::apache::thrift::protocol::T_I32) {
-                xfer += iprot->readI32(this->ttl_seconds);
-                this->__isset.ttl_seconds = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 3:
-            if (ftype == ::apache::thrift::protocol::T_I32) {
-                xfer += iprot->readI32(this->app_id);
-                this->__isset.app_id = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 4:
-            if (ftype == ::apache::thrift::protocol::T_I32) {
-                xfer += iprot->readI32(this->partition_index);
-                this->__isset.partition_index = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 6:
-            if (ftype == ::apache::thrift::protocol::T_STRING) {
-                xfer += iprot->readString(this->server);
-                this->__isset.server = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        default:
-            xfer += iprot->skip(ftype);
-            break;
-        }
-        xfer += iprot->readFieldEnd();
-    }
-
-    xfer += iprot->readStructEnd();
-
-    return xfer;
-}
-
-uint32_t ttl_response::write(::apache::thrift::protocol::TProtocol *oprot) const
-{
-    uint32_t xfer = 0;
-    apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("ttl_response");
-
-    xfer += oprot->writeFieldBegin("error", ::apache::thrift::protocol::T_I32, 1);
-    xfer += oprot->writeI32(this->error);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("ttl_seconds", ::apache::thrift::protocol::T_I32, 2);
-    xfer += oprot->writeI32(this->ttl_seconds);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("app_id", ::apache::thrift::protocol::T_I32, 3);
-    xfer += oprot->writeI32(this->app_id);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("partition_index", ::apache::thrift::protocol::T_I32, 4);
-    xfer += oprot->writeI32(this->partition_index);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("server", ::apache::thrift::protocol::T_STRING, 6);
-    xfer += oprot->writeString(this->server);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
-}
-
-void swap(ttl_response &a, ttl_response &b)
-{
-    using ::std::swap;
-    swap(a.error, b.error);
-    swap(a.ttl_seconds, b.ttl_seconds);
-    swap(a.app_id, b.app_id);
-    swap(a.partition_index, b.partition_index);
-    swap(a.server, b.server);
-    swap(a.__isset, b.__isset);
-}
-
-ttl_response::ttl_response(const ttl_response &other12)
-{
-    error = other12.error;
-    ttl_seconds = other12.ttl_seconds;
-    app_id = other12.app_id;
-    partition_index = other12.partition_index;
-    server = other12.server;
-    __isset = other12.__isset;
-}
-ttl_response::ttl_response(ttl_response &&other13)
-{
-    error = std::move(other13.error);
-    ttl_seconds = std::move(other13.ttl_seconds);
-    app_id = std::move(other13.app_id);
-    partition_index = std::move(other13.partition_index);
-    server = std::move(other13.server);
-    __isset = std::move(other13.__isset);
-}
-ttl_response &ttl_response::operator=(const ttl_response &other14)
-{
-    error = other14.error;
-    ttl_seconds = other14.ttl_seconds;
-    app_id = other14.app_id;
-    partition_index = other14.partition_index;
-    server = other14.server;
-    __isset = other14.__isset;
-    return *this;
-}
-ttl_response &ttl_response::operator=(ttl_response &&other15)
-{
-    error = std::move(other15.error);
-    ttl_seconds = std::move(other15.ttl_seconds);
-    app_id = std::move(other15.app_id);
-    partition_index = std::move(other15.partition_index);
-    server = std::move(other15.server);
-    __isset = std::move(other15.__isset);
-    return *this;
-}
-void ttl_response::printTo(std::ostream &out) const
-{
-    using ::apache::thrift::to_string;
-    out << "ttl_response(";
-    out << "error=" << to_string(error);
-    out << ", "
-        << "ttl_seconds=" << to_string(ttl_seconds);
-    out << ", "
-        << "app_id=" << to_string(app_id);
-    out << ", "
-        << "partition_index=" << to_string(partition_index);
-    out << ", "
-        << "server=" << to_string(server);
-    out << ")";
-}
-
-count_response::~count_response() throw() {}
-
-void count_response::__set_error(const int32_t val) { this->error = val; }
-
-void count_response::__set_count(const int64_t val) { this->count = val; }
-
-void count_response::__set_app_id(const int32_t val) { this->app_id = val; }
-
-void count_response::__set_partition_index(const int32_t val) { this->partition_index = val; }
-
-void count_response::__set_server(const std::string &val) { this->server = val; }
-
-uint32_t count_response::read(::apache::thrift::protocol::TProtocol *iprot)
-{
-
-    apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
-
-    xfer += iprot->readStructBegin(fname);
-
-    using ::apache::thrift::protocol::TProtocolException;
-
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-        case 1:
-            if (ftype == ::apache::thrift::protocol::T_I32) {
-                xfer += iprot->readI32(this->error);
-                this->__isset.error = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 2:
-            if (ftype == ::apache::thrift::protocol::T_I64) {
-                xfer += iprot->readI64(this->count);
-                this->__isset.count = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 3:
-            if (ftype == ::apache::thrift::protocol::T_I32) {
-                xfer += iprot->readI32(this->app_id);
-                this->__isset.app_id = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 4:
-            if (ftype == ::apache::thrift::protocol::T_I32) {
-                xfer += iprot->readI32(this->partition_index);
-                this->__isset.partition_index = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 6:
-            if (ftype == ::apache::thrift::protocol::T_STRING) {
-                xfer += iprot->readString(this->server);
-                this->__isset.server = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        default:
-            xfer += iprot->skip(ftype);
-            break;
-        }
-        xfer += iprot->readFieldEnd();
-    }
-
-    xfer += iprot->readStructEnd();
-
-    return xfer;
-}
-
-uint32_t count_response::write(::apache::thrift::protocol::TProtocol *oprot) const
-{
-    uint32_t xfer = 0;
-    apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("count_response");
-
-    xfer += oprot->writeFieldBegin("error", ::apache::thrift::protocol::T_I32, 1);
-    xfer += oprot->writeI32(this->error);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("count", ::apache::thrift::protocol::T_I64, 2);
-    xfer += oprot->writeI64(this->count);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("app_id", ::apache::thrift::protocol::T_I32, 3);
-    xfer += oprot->writeI32(this->app_id);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("partition_index", ::apache::thrift::protocol::T_I32, 4);
-    xfer += oprot->writeI32(this->partition_index);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("server", ::apache::thrift::protocol::T_STRING, 6);
-    xfer += oprot->writeString(this->server);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
-}
-
-void swap(count_response &a, count_response &b)
-{
-    using ::std::swap;
-    swap(a.error, b.error);
-    swap(a.count, b.count);
-    swap(a.app_id, b.app_id);
-    swap(a.partition_index, b.partition_index);
-    swap(a.server, b.server);
-    swap(a.__isset, b.__isset);
-}
-
-count_response::count_response(const count_response &other16)
-{
-    error = other16.error;
-    count = other16.count;
-    app_id = other16.app_id;
-    partition_index = other16.partition_index;
-    server = other16.server;
-    __isset = other16.__isset;
-}
-count_response::count_response(count_response &&other17)
-{
-    error = std::move(other17.error);
-    count = std::move(other17.count);
-    app_id = std::move(other17.app_id);
-    partition_index = std::move(other17.partition_index);
-    server = std::move(other17.server);
-    __isset = std::move(other17.__isset);
-}
-count_response &count_response::operator=(const count_response &other18)
-{
-    error = other18.error;
-    count = other18.count;
-    app_id = other18.app_id;
-    partition_index = other18.partition_index;
-    server = other18.server;
-    __isset = other18.__isset;
-    return *this;
-}
-count_response &count_response::operator=(count_response &&other19)
-{
-    error = std::move(other19.error);
-    count = std::move(other19.count);
-    app_id = std::move(other19.app_id);
-    partition_index = std::move(other19.partition_index);
-    server = std::move(other19.server);
-    __isset = std::move(other19.__isset);
-    return *this;
-}
-void count_response::printTo(std::ostream &out) const
-{
-    using ::apache::thrift::to_string;
-    out << "count_response(";
-    out << "error=" << to_string(error);
-    out << ", "
-        << "count=" << to_string(count);
-    out << ", "
-        << "app_id=" << to_string(app_id);
-    out << ", "
-        << "partition_index=" << to_string(partition_index);
-    out << ", "
-        << "server=" << to_string(server);
-    out << ")";
-}
-
-key_value::~key_value() throw() {}
-
-void key_value::__set_key(const ::dsn::blob &val) { this->key = val; }
-
-void key_value::__set_value(const ::dsn::blob &val) { this->value = val; }
-
-uint32_t key_value::read(::apache::thrift::protocol::TProtocol *iprot)
-{
-
-    apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
-
-    xfer += iprot->readStructBegin(fname);
-
-    using ::apache::thrift::protocol::TProtocolException;
-
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-        case 1:
-            if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                xfer += this->key.read(iprot);
-                this->__isset.key = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 2:
-            if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                xfer += this->value.read(iprot);
-                this->__isset.value = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        default:
-            xfer += iprot->skip(ftype);
-            break;
-        }
-        xfer += iprot->readFieldEnd();
-    }
-
-    xfer += iprot->readStructEnd();
-
-    return xfer;
-}
-
-uint32_t key_value::write(::apache::thrift::protocol::TProtocol *oprot) const
-{
-    uint32_t xfer = 0;
-    apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("key_value");
-
-    xfer += oprot->writeFieldBegin("key", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->key.write(oprot);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("value", ::apache::thrift::protocol::T_STRUCT, 2);
-    xfer += this->value.write(oprot);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
-}
-
-void swap(key_value &a, key_value &b)
-{
-    using ::std::swap;
-    swap(a.key, b.key);
-    swap(a.value, b.value);
-    swap(a.__isset, b.__isset);
-}
-
-key_value::key_value(const key_value &other20)
-{
-    key = other20.key;
-    value = other20.value;
-    __isset = other20.__isset;
-}
-key_value::key_value(key_value &&other21)
-{
-    key = std::move(other21.key);
-    value = std::move(other21.value);
-    __isset = std::move(other21.__isset);
-}
-key_value &key_value::operator=(const key_value &other22)
-{
-    key = other22.key;
-    value = other22.value;
-    __isset = other22.__isset;
-    return *this;
-}
-key_value &key_value::operator=(key_value &&other23)
-{
-    key = std::move(other23.key);
-    value = std::move(other23.value);
-    __isset = std::move(other23.__isset);
-    return *this;
-}
-void key_value::printTo(std::ostream &out) const
-{
-    using ::apache::thrift::to_string;
-    out << "key_value(";
-    out << "key=" << to_string(key);
-    out << ", "
-        << "value=" << to_string(value);
-    out << ")";
-}
-
-multi_put_request::~multi_put_request() throw() {}
-
-void multi_put_request::__set_hash_key(const ::dsn::blob &val) { this->hash_key = val; }
-
-void multi_put_request::__set_kvs(const std::vector<key_value> &val) { this->kvs = val; }
-
-void multi_put_request::__set_expire_ts_seconds(const int32_t val)
-{
-    this->expire_ts_seconds = val;
-}
-
-uint32_t multi_put_request::read(::apache::thrift::protocol::TProtocol *iprot)
-{
-
-    apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
-
-    xfer += iprot->readStructBegin(fname);
-
-    using ::apache::thrift::protocol::TProtocolException;
-
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-        case 1:
-            if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                xfer += this->hash_key.read(iprot);
-                this->__isset.hash_key = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 2:
-            if (ftype == ::apache::thrift::protocol::T_LIST) {
-                {
-                    this->kvs.clear();
-                    uint32_t _size24;
-                    ::apache::thrift::protocol::TType _etype27;
-                    xfer += iprot->readListBegin(_etype27, _size24);
-                    this->kvs.resize(_size24);
-                    uint32_t _i28;
-                    for (_i28 = 0; _i28 < _size24; ++_i28) {
-                        xfer += this->kvs[_i28].read(iprot);
-                    }
-                    xfer += iprot->readListEnd();
-                }
-                this->__isset.kvs = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 3:
-            if (ftype == ::apache::thrift::protocol::T_I32) {
-                xfer += iprot->readI32(this->expire_ts_seconds);
-                this->__isset.expire_ts_seconds = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        default:
-            xfer += iprot->skip(ftype);
-            break;
-        }
-        xfer += iprot->readFieldEnd();
-    }
-
-    xfer += iprot->readStructEnd();
-
-    return xfer;
-}
-
-uint32_t multi_put_request::write(::apache::thrift::protocol::TProtocol *oprot) const
-{
-    uint32_t xfer = 0;
-    apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("multi_put_request");
-
-    xfer += oprot->writeFieldBegin("hash_key", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->hash_key.write(oprot);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("kvs", ::apache::thrift::protocol::T_LIST, 2);
+    switch (fid)
     {
-        xfer += oprot->writeListBegin(::apache::thrift::protocol::T_STRUCT,
-                                      static_cast<uint32_t>(this->kvs.size()));
-        std::vector<key_value>::const_iterator _iter29;
-        for (_iter29 = this->kvs.begin(); _iter29 != this->kvs.end(); ++_iter29) {
-            xfer += (*_iter29).write(oprot);
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->key.read(iprot);
+          this->__isset.key = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += oprot->writeListEnd();
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->value.read(iprot);
+          this->__isset.value = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 3:
+        if (ftype == ::apache::thrift::protocol::T_I32) {
+          xfer += iprot->readI32(this->expire_ts_seconds);
+          this->__isset.expire_ts_seconds = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
-    xfer += oprot->writeFieldEnd();
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += oprot->writeFieldBegin("expire_ts_seconds", ::apache::thrift::protocol::T_I32, 3);
-    xfer += oprot->writeI32(this->expire_ts_seconds);
-    xfer += oprot->writeFieldEnd();
+  xfer += iprot->readStructEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  return xfer;
 }
 
-void swap(multi_put_request &a, multi_put_request &b)
-{
-    using ::std::swap;
-    swap(a.hash_key, b.hash_key);
-    swap(a.kvs, b.kvs);
-    swap(a.expire_ts_seconds, b.expire_ts_seconds);
-    swap(a.__isset, b.__isset);
+uint32_t update_request::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("update_request");
+
+  xfer += oprot->writeFieldBegin("key", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->key.write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("value", ::apache::thrift::protocol::T_STRUCT, 2);
+  xfer += this->value.write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("expire_ts_seconds", ::apache::thrift::protocol::T_I32, 3);
+  xfer += oprot->writeI32(this->expire_ts_seconds);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
 
-multi_put_request::multi_put_request(const multi_put_request &other30)
-{
-    hash_key = other30.hash_key;
-    kvs = other30.kvs;
-    expire_ts_seconds = other30.expire_ts_seconds;
-    __isset = other30.__isset;
-}
-multi_put_request::multi_put_request(multi_put_request &&other31)
-{
-    hash_key = std::move(other31.hash_key);
-    kvs = std::move(other31.kvs);
-    expire_ts_seconds = std::move(other31.expire_ts_seconds);
-    __isset = std::move(other31.__isset);
-}
-multi_put_request &multi_put_request::operator=(const multi_put_request &other32)
-{
-    hash_key = other32.hash_key;
-    kvs = other32.kvs;
-    expire_ts_seconds = other32.expire_ts_seconds;
-    __isset = other32.__isset;
-    return *this;
-}
-multi_put_request &multi_put_request::operator=(multi_put_request &&other33)
-{
-    hash_key = std::move(other33.hash_key);
-    kvs = std::move(other33.kvs);
-    expire_ts_seconds = std::move(other33.expire_ts_seconds);
-    __isset = std::move(other33.__isset);
-    return *this;
-}
-void multi_put_request::printTo(std::ostream &out) const
-{
-    using ::apache::thrift::to_string;
-    out << "multi_put_request(";
-    out << "hash_key=" << to_string(hash_key);
-    out << ", "
-        << "kvs=" << to_string(kvs);
-    out << ", "
-        << "expire_ts_seconds=" << to_string(expire_ts_seconds);
-    out << ")";
+void swap(update_request &a, update_request &b) {
+  using ::std::swap;
+  swap(a.key, b.key);
+  swap(a.value, b.value);
+  swap(a.expire_ts_seconds, b.expire_ts_seconds);
+  swap(a.__isset, b.__isset);
 }
 
-multi_remove_request::~multi_remove_request() throw() {}
-
-void multi_remove_request::__set_hash_key(const ::dsn::blob &val) { this->hash_key = val; }
-
-void multi_remove_request::__set_sort_keys(const std::vector<::dsn::blob> &val)
-{
-    this->sort_keys = val;
+update_request::update_request(const update_request& other0) {
+  key = other0.key;
+  value = other0.value;
+  expire_ts_seconds = other0.expire_ts_seconds;
+  __isset = other0.__isset;
+}
+update_request::update_request( update_request&& other1) {
+  key = std::move(other1.key);
+  value = std::move(other1.value);
+  expire_ts_seconds = std::move(other1.expire_ts_seconds);
+  __isset = std::move(other1.__isset);
+}
+update_request& update_request::operator=(const update_request& other2) {
+  key = other2.key;
+  value = other2.value;
+  expire_ts_seconds = other2.expire_ts_seconds;
+  __isset = other2.__isset;
+  return *this;
+}
+update_request& update_request::operator=(update_request&& other3) {
+  key = std::move(other3.key);
+  value = std::move(other3.value);
+  expire_ts_seconds = std::move(other3.expire_ts_seconds);
+  __isset = std::move(other3.__isset);
+  return *this;
+}
+void update_request::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "update_request(";
+  out << "key=" << to_string(key);
+  out << ", " << "value=" << to_string(value);
+  out << ", " << "expire_ts_seconds=" << to_string(expire_ts_seconds);
+  out << ")";
 }
 
-void multi_remove_request::__set_max_count(const int64_t val) { this->max_count = val; }
 
-uint32_t multi_remove_request::read(::apache::thrift::protocol::TProtocol *iprot)
-{
+update_response::~update_response() throw() {
+}
 
-    apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+void update_response::__set_error(const int32_t val) {
+  this->error = val;
+}
 
-    using ::apache::thrift::protocol::TProtocolException;
+void update_response::__set_app_id(const int32_t val) {
+  this->app_id = val;
+}
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-        case 1:
-            if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                xfer += this->hash_key.read(iprot);
-                this->__isset.hash_key = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 2:
-            if (ftype == ::apache::thrift::protocol::T_LIST) {
-                {
-                    this->sort_keys.clear();
-                    uint32_t _size34;
-                    ::apache::thrift::protocol::TType _etype37;
-                    xfer += iprot->readListBegin(_etype37, _size34);
-                    this->sort_keys.resize(_size34);
-                    uint32_t _i38;
-                    for (_i38 = 0; _i38 < _size34; ++_i38) {
-                        xfer += this->sort_keys[_i38].read(iprot);
-                    }
-                    xfer += iprot->readListEnd();
-                }
-                this->__isset.sort_keys = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 3:
-            if (ftype == ::apache::thrift::protocol::T_I64) {
-                xfer += iprot->readI64(this->max_count);
-                this->__isset.max_count = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        default:
-            xfer += iprot->skip(ftype);
-            break;
-        }
-        xfer += iprot->readFieldEnd();
+void update_response::__set_partition_index(const int32_t val) {
+  this->partition_index = val;
+}
+
+void update_response::__set_decree(const int64_t val) {
+  this->decree = val;
+}
+
+void update_response::__set_server(const std::string& val) {
+  this->server = val;
+}
+
+uint32_t update_response::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
     }
-
-    xfer += iprot->readStructEnd();
-
-    return xfer;
-}
-
-uint32_t multi_remove_request::write(::apache::thrift::protocol::TProtocol *oprot) const
-{
-    uint32_t xfer = 0;
-    apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("multi_remove_request");
-
-    xfer += oprot->writeFieldBegin("hash_key", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->hash_key.write(oprot);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("sort_keys", ::apache::thrift::protocol::T_LIST, 2);
+    switch (fid)
     {
-        xfer += oprot->writeListBegin(::apache::thrift::protocol::T_STRUCT,
-                                      static_cast<uint32_t>(this->sort_keys.size()));
-        std::vector<::dsn::blob>::const_iterator _iter39;
-        for (_iter39 = this->sort_keys.begin(); _iter39 != this->sort_keys.end(); ++_iter39) {
-            xfer += (*_iter39).write(oprot);
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_I32) {
+          xfer += iprot->readI32(this->error);
+          this->__isset.error = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += oprot->writeListEnd();
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_I32) {
+          xfer += iprot->readI32(this->app_id);
+          this->__isset.app_id = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 3:
+        if (ftype == ::apache::thrift::protocol::T_I32) {
+          xfer += iprot->readI32(this->partition_index);
+          this->__isset.partition_index = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 4:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->decree);
+          this->__isset.decree = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 5:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->server);
+          this->__isset.server = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
-    xfer += oprot->writeFieldEnd();
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += oprot->writeFieldBegin("max_count", ::apache::thrift::protocol::T_I64, 3);
-    xfer += oprot->writeI64(this->max_count);
-    xfer += oprot->writeFieldEnd();
+  xfer += iprot->readStructEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  return xfer;
 }
 
-void swap(multi_remove_request &a, multi_remove_request &b)
-{
-    using ::std::swap;
-    swap(a.hash_key, b.hash_key);
-    swap(a.sort_keys, b.sort_keys);
-    swap(a.max_count, b.max_count);
-    swap(a.__isset, b.__isset);
+uint32_t update_response::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("update_response");
+
+  xfer += oprot->writeFieldBegin("error", ::apache::thrift::protocol::T_I32, 1);
+  xfer += oprot->writeI32(this->error);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("app_id", ::apache::thrift::protocol::T_I32, 2);
+  xfer += oprot->writeI32(this->app_id);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("partition_index", ::apache::thrift::protocol::T_I32, 3);
+  xfer += oprot->writeI32(this->partition_index);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("decree", ::apache::thrift::protocol::T_I64, 4);
+  xfer += oprot->writeI64(this->decree);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("server", ::apache::thrift::protocol::T_STRING, 5);
+  xfer += oprot->writeString(this->server);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
 
-multi_remove_request::multi_remove_request(const multi_remove_request &other40)
-{
-    hash_key = other40.hash_key;
-    sort_keys = other40.sort_keys;
-    max_count = other40.max_count;
-    __isset = other40.__isset;
-}
-multi_remove_request::multi_remove_request(multi_remove_request &&other41)
-{
-    hash_key = std::move(other41.hash_key);
-    sort_keys = std::move(other41.sort_keys);
-    max_count = std::move(other41.max_count);
-    __isset = std::move(other41.__isset);
-}
-multi_remove_request &multi_remove_request::operator=(const multi_remove_request &other42)
-{
-    hash_key = other42.hash_key;
-    sort_keys = other42.sort_keys;
-    max_count = other42.max_count;
-    __isset = other42.__isset;
-    return *this;
-}
-multi_remove_request &multi_remove_request::operator=(multi_remove_request &&other43)
-{
-    hash_key = std::move(other43.hash_key);
-    sort_keys = std::move(other43.sort_keys);
-    max_count = std::move(other43.max_count);
-    __isset = std::move(other43.__isset);
-    return *this;
-}
-void multi_remove_request::printTo(std::ostream &out) const
-{
-    using ::apache::thrift::to_string;
-    out << "multi_remove_request(";
-    out << "hash_key=" << to_string(hash_key);
-    out << ", "
-        << "sort_keys=" << to_string(sort_keys);
-    out << ", "
-        << "max_count=" << to_string(max_count);
-    out << ")";
+void swap(update_response &a, update_response &b) {
+  using ::std::swap;
+  swap(a.error, b.error);
+  swap(a.app_id, b.app_id);
+  swap(a.partition_index, b.partition_index);
+  swap(a.decree, b.decree);
+  swap(a.server, b.server);
+  swap(a.__isset, b.__isset);
 }
 
-multi_remove_response::~multi_remove_response() throw() {}
-
-void multi_remove_response::__set_error(const int32_t val) { this->error = val; }
-
-void multi_remove_response::__set_count(const int64_t val) { this->count = val; }
-
-void multi_remove_response::__set_app_id(const int32_t val) { this->app_id = val; }
-
-void multi_remove_response::__set_partition_index(const int32_t val)
-{
-    this->partition_index = val;
+update_response::update_response(const update_response& other4) {
+  error = other4.error;
+  app_id = other4.app_id;
+  partition_index = other4.partition_index;
+  decree = other4.decree;
+  server = other4.server;
+  __isset = other4.__isset;
+}
+update_response::update_response( update_response&& other5) {
+  error = std::move(other5.error);
+  app_id = std::move(other5.app_id);
+  partition_index = std::move(other5.partition_index);
+  decree = std::move(other5.decree);
+  server = std::move(other5.server);
+  __isset = std::move(other5.__isset);
+}
+update_response& update_response::operator=(const update_response& other6) {
+  error = other6.error;
+  app_id = other6.app_id;
+  partition_index = other6.partition_index;
+  decree = other6.decree;
+  server = other6.server;
+  __isset = other6.__isset;
+  return *this;
+}
+update_response& update_response::operator=(update_response&& other7) {
+  error = std::move(other7.error);
+  app_id = std::move(other7.app_id);
+  partition_index = std::move(other7.partition_index);
+  decree = std::move(other7.decree);
+  server = std::move(other7.server);
+  __isset = std::move(other7.__isset);
+  return *this;
+}
+void update_response::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "update_response(";
+  out << "error=" << to_string(error);
+  out << ", " << "app_id=" << to_string(app_id);
+  out << ", " << "partition_index=" << to_string(partition_index);
+  out << ", " << "decree=" << to_string(decree);
+  out << ", " << "server=" << to_string(server);
+  out << ")";
 }
 
-void multi_remove_response::__set_decree(const int64_t val) { this->decree = val; }
 
-void multi_remove_response::__set_server(const std::string &val) { this->server = val; }
+read_response::~read_response() throw() {
+}
 
-uint32_t multi_remove_response::read(::apache::thrift::protocol::TProtocol *iprot)
-{
 
-    apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+void read_response::__set_error(const int32_t val) {
+  this->error = val;
+}
 
-    xfer += iprot->readStructBegin(fname);
+void read_response::__set_value(const  ::dsn::blob& val) {
+  this->value = val;
+}
 
-    using ::apache::thrift::protocol::TProtocolException;
+void read_response::__set_app_id(const int32_t val) {
+  this->app_id = val;
+}
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-        case 1:
-            if (ftype == ::apache::thrift::protocol::T_I32) {
-                xfer += iprot->readI32(this->error);
-                this->__isset.error = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 2:
-            if (ftype == ::apache::thrift::protocol::T_I64) {
-                xfer += iprot->readI64(this->count);
-                this->__isset.count = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 3:
-            if (ftype == ::apache::thrift::protocol::T_I32) {
-                xfer += iprot->readI32(this->app_id);
-                this->__isset.app_id = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 4:
-            if (ftype == ::apache::thrift::protocol::T_I32) {
-                xfer += iprot->readI32(this->partition_index);
-                this->__isset.partition_index = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 5:
-            if (ftype == ::apache::thrift::protocol::T_I64) {
-                xfer += iprot->readI64(this->decree);
-                this->__isset.decree = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 6:
-            if (ftype == ::apache::thrift::protocol::T_STRING) {
-                xfer += iprot->readString(this->server);
-                this->__isset.server = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        default:
-            xfer += iprot->skip(ftype);
-            break;
-        }
-        xfer += iprot->readFieldEnd();
+void read_response::__set_partition_index(const int32_t val) {
+  this->partition_index = val;
+}
+
+void read_response::__set_server(const std::string& val) {
+  this->server = val;
+}
+
+uint32_t read_response::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
     }
-
-    xfer += iprot->readStructEnd();
-
-    return xfer;
-}
-
-uint32_t multi_remove_response::write(::apache::thrift::protocol::TProtocol *oprot) const
-{
-    uint32_t xfer = 0;
-    apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("multi_remove_response");
-
-    xfer += oprot->writeFieldBegin("error", ::apache::thrift::protocol::T_I32, 1);
-    xfer += oprot->writeI32(this->error);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("count", ::apache::thrift::protocol::T_I64, 2);
-    xfer += oprot->writeI64(this->count);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("app_id", ::apache::thrift::protocol::T_I32, 3);
-    xfer += oprot->writeI32(this->app_id);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("partition_index", ::apache::thrift::protocol::T_I32, 4);
-    xfer += oprot->writeI32(this->partition_index);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("decree", ::apache::thrift::protocol::T_I64, 5);
-    xfer += oprot->writeI64(this->decree);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("server", ::apache::thrift::protocol::T_STRING, 6);
-    xfer += oprot->writeString(this->server);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
-}
-
-void swap(multi_remove_response &a, multi_remove_response &b)
-{
-    using ::std::swap;
-    swap(a.error, b.error);
-    swap(a.count, b.count);
-    swap(a.app_id, b.app_id);
-    swap(a.partition_index, b.partition_index);
-    swap(a.decree, b.decree);
-    swap(a.server, b.server);
-    swap(a.__isset, b.__isset);
-}
-
-multi_remove_response::multi_remove_response(const multi_remove_response &other44)
-{
-    error = other44.error;
-    count = other44.count;
-    app_id = other44.app_id;
-    partition_index = other44.partition_index;
-    decree = other44.decree;
-    server = other44.server;
-    __isset = other44.__isset;
-}
-multi_remove_response::multi_remove_response(multi_remove_response &&other45)
-{
-    error = std::move(other45.error);
-    count = std::move(other45.count);
-    app_id = std::move(other45.app_id);
-    partition_index = std::move(other45.partition_index);
-    decree = std::move(other45.decree);
-    server = std::move(other45.server);
-    __isset = std::move(other45.__isset);
-}
-multi_remove_response &multi_remove_response::operator=(const multi_remove_response &other46)
-{
-    error = other46.error;
-    count = other46.count;
-    app_id = other46.app_id;
-    partition_index = other46.partition_index;
-    decree = other46.decree;
-    server = other46.server;
-    __isset = other46.__isset;
-    return *this;
-}
-multi_remove_response &multi_remove_response::operator=(multi_remove_response &&other47)
-{
-    error = std::move(other47.error);
-    count = std::move(other47.count);
-    app_id = std::move(other47.app_id);
-    partition_index = std::move(other47.partition_index);
-    decree = std::move(other47.decree);
-    server = std::move(other47.server);
-    __isset = std::move(other47.__isset);
-    return *this;
-}
-void multi_remove_response::printTo(std::ostream &out) const
-{
-    using ::apache::thrift::to_string;
-    out << "multi_remove_response(";
-    out << "error=" << to_string(error);
-    out << ", "
-        << "count=" << to_string(count);
-    out << ", "
-        << "app_id=" << to_string(app_id);
-    out << ", "
-        << "partition_index=" << to_string(partition_index);
-    out << ", "
-        << "decree=" << to_string(decree);
-    out << ", "
-        << "server=" << to_string(server);
-    out << ")";
-}
-
-multi_get_request::~multi_get_request() throw() {}
-
-void multi_get_request::__set_hash_key(const ::dsn::blob &val) { this->hash_key = val; }
-
-void multi_get_request::__set_sort_keys(const std::vector<::dsn::blob> &val)
-{
-    this->sort_keys = val;
-}
-
-void multi_get_request::__set_max_kv_count(const int32_t val) { this->max_kv_count = val; }
-
-void multi_get_request::__set_max_kv_size(const int32_t val) { this->max_kv_size = val; }
-
-void multi_get_request::__set_no_value(const bool val) { this->no_value = val; }
-
-void multi_get_request::__set_start_sortkey(const ::dsn::blob &val) { this->start_sortkey = val; }
-
-void multi_get_request::__set_stop_sortkey(const ::dsn::blob &val) { this->stop_sortkey = val; }
-
-void multi_get_request::__set_start_inclusive(const bool val) { this->start_inclusive = val; }
-
-void multi_get_request::__set_stop_inclusive(const bool val) { this->stop_inclusive = val; }
-
-void multi_get_request::__set_sort_key_filter_type(const filter_type::type val)
-{
-    this->sort_key_filter_type = val;
-}
-
-void multi_get_request::__set_sort_key_filter_pattern(const ::dsn::blob &val)
-{
-    this->sort_key_filter_pattern = val;
-}
-
-void multi_get_request::__set_reverse(const bool val) { this->reverse = val; }
-
-uint32_t multi_get_request::read(::apache::thrift::protocol::TProtocol *iprot)
-{
-
-    apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
-
-    xfer += iprot->readStructBegin(fname);
-
-    using ::apache::thrift::protocol::TProtocolException;
-
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-        case 1:
-            if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                xfer += this->hash_key.read(iprot);
-                this->__isset.hash_key = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 2:
-            if (ftype == ::apache::thrift::protocol::T_LIST) {
-                {
-                    this->sort_keys.clear();
-                    uint32_t _size48;
-                    ::apache::thrift::protocol::TType _etype51;
-                    xfer += iprot->readListBegin(_etype51, _size48);
-                    this->sort_keys.resize(_size48);
-                    uint32_t _i52;
-                    for (_i52 = 0; _i52 < _size48; ++_i52) {
-                        xfer += this->sort_keys[_i52].read(iprot);
-                    }
-                    xfer += iprot->readListEnd();
-                }
-                this->__isset.sort_keys = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 3:
-            if (ftype == ::apache::thrift::protocol::T_I32) {
-                xfer += iprot->readI32(this->max_kv_count);
-                this->__isset.max_kv_count = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 4:
-            if (ftype == ::apache::thrift::protocol::T_I32) {
-                xfer += iprot->readI32(this->max_kv_size);
-                this->__isset.max_kv_size = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 5:
-            if (ftype == ::apache::thrift::protocol::T_BOOL) {
-                xfer += iprot->readBool(this->no_value);
-                this->__isset.no_value = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 6:
-            if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                xfer += this->start_sortkey.read(iprot);
-                this->__isset.start_sortkey = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 7:
-            if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                xfer += this->stop_sortkey.read(iprot);
-                this->__isset.stop_sortkey = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 8:
-            if (ftype == ::apache::thrift::protocol::T_BOOL) {
-                xfer += iprot->readBool(this->start_inclusive);
-                this->__isset.start_inclusive = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 9:
-            if (ftype == ::apache::thrift::protocol::T_BOOL) {
-                xfer += iprot->readBool(this->stop_inclusive);
-                this->__isset.stop_inclusive = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 10:
-            if (ftype == ::apache::thrift::protocol::T_I32) {
-                int32_t ecast53;
-                xfer += iprot->readI32(ecast53);
-                this->sort_key_filter_type = (filter_type::type)ecast53;
-                this->__isset.sort_key_filter_type = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 11:
-            if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                xfer += this->sort_key_filter_pattern.read(iprot);
-                this->__isset.sort_key_filter_pattern = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 12:
-            if (ftype == ::apache::thrift::protocol::T_BOOL) {
-                xfer += iprot->readBool(this->reverse);
-                this->__isset.reverse = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        default:
-            xfer += iprot->skip(ftype);
-            break;
-        }
-        xfer += iprot->readFieldEnd();
-    }
-
-    xfer += iprot->readStructEnd();
-
-    return xfer;
-}
-
-uint32_t multi_get_request::write(::apache::thrift::protocol::TProtocol *oprot) const
-{
-    uint32_t xfer = 0;
-    apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("multi_get_request");
-
-    xfer += oprot->writeFieldBegin("hash_key", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->hash_key.write(oprot);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("sort_keys", ::apache::thrift::protocol::T_LIST, 2);
+    switch (fid)
     {
-        xfer += oprot->writeListBegin(::apache::thrift::protocol::T_STRUCT,
-                                      static_cast<uint32_t>(this->sort_keys.size()));
-        std::vector<::dsn::blob>::const_iterator _iter54;
-        for (_iter54 = this->sort_keys.begin(); _iter54 != this->sort_keys.end(); ++_iter54) {
-            xfer += (*_iter54).write(oprot);
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_I32) {
+          xfer += iprot->readI32(this->error);
+          this->__isset.error = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += oprot->writeListEnd();
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->value.read(iprot);
+          this->__isset.value = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 3:
+        if (ftype == ::apache::thrift::protocol::T_I32) {
+          xfer += iprot->readI32(this->app_id);
+          this->__isset.app_id = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 4:
+        if (ftype == ::apache::thrift::protocol::T_I32) {
+          xfer += iprot->readI32(this->partition_index);
+          this->__isset.partition_index = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 6:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->server);
+          this->__isset.server = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
-    xfer += oprot->writeFieldEnd();
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += oprot->writeFieldBegin("max_kv_count", ::apache::thrift::protocol::T_I32, 3);
-    xfer += oprot->writeI32(this->max_kv_count);
-    xfer += oprot->writeFieldEnd();
+  xfer += iprot->readStructEnd();
 
-    xfer += oprot->writeFieldBegin("max_kv_size", ::apache::thrift::protocol::T_I32, 4);
-    xfer += oprot->writeI32(this->max_kv_size);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("no_value", ::apache::thrift::protocol::T_BOOL, 5);
-    xfer += oprot->writeBool(this->no_value);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("start_sortkey", ::apache::thrift::protocol::T_STRUCT, 6);
-    xfer += this->start_sortkey.write(oprot);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("stop_sortkey", ::apache::thrift::protocol::T_STRUCT, 7);
-    xfer += this->stop_sortkey.write(oprot);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("start_inclusive", ::apache::thrift::protocol::T_BOOL, 8);
-    xfer += oprot->writeBool(this->start_inclusive);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("stop_inclusive", ::apache::thrift::protocol::T_BOOL, 9);
-    xfer += oprot->writeBool(this->stop_inclusive);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("sort_key_filter_type", ::apache::thrift::protocol::T_I32, 10);
-    xfer += oprot->writeI32((int32_t)this->sort_key_filter_type);
-    xfer += oprot->writeFieldEnd();
-
-    xfer +=
-        oprot->writeFieldBegin("sort_key_filter_pattern", ::apache::thrift::protocol::T_STRUCT, 11);
-    xfer += this->sort_key_filter_pattern.write(oprot);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("reverse", ::apache::thrift::protocol::T_BOOL, 12);
-    xfer += oprot->writeBool(this->reverse);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  return xfer;
 }
 
-void swap(multi_get_request &a, multi_get_request &b)
-{
-    using ::std::swap;
-    swap(a.hash_key, b.hash_key);
-    swap(a.sort_keys, b.sort_keys);
-    swap(a.max_kv_count, b.max_kv_count);
-    swap(a.max_kv_size, b.max_kv_size);
-    swap(a.no_value, b.no_value);
-    swap(a.start_sortkey, b.start_sortkey);
-    swap(a.stop_sortkey, b.stop_sortkey);
-    swap(a.start_inclusive, b.start_inclusive);
-    swap(a.stop_inclusive, b.stop_inclusive);
-    swap(a.sort_key_filter_type, b.sort_key_filter_type);
-    swap(a.sort_key_filter_pattern, b.sort_key_filter_pattern);
-    swap(a.reverse, b.reverse);
-    swap(a.__isset, b.__isset);
+uint32_t read_response::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("read_response");
+
+  xfer += oprot->writeFieldBegin("error", ::apache::thrift::protocol::T_I32, 1);
+  xfer += oprot->writeI32(this->error);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("value", ::apache::thrift::protocol::T_STRUCT, 2);
+  xfer += this->value.write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("app_id", ::apache::thrift::protocol::T_I32, 3);
+  xfer += oprot->writeI32(this->app_id);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("partition_index", ::apache::thrift::protocol::T_I32, 4);
+  xfer += oprot->writeI32(this->partition_index);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("server", ::apache::thrift::protocol::T_STRING, 6);
+  xfer += oprot->writeString(this->server);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
 
-multi_get_request::multi_get_request(const multi_get_request &other55)
-{
-    hash_key = other55.hash_key;
-    sort_keys = other55.sort_keys;
-    max_kv_count = other55.max_kv_count;
-    max_kv_size = other55.max_kv_size;
-    no_value = other55.no_value;
-    start_sortkey = other55.start_sortkey;
-    stop_sortkey = other55.stop_sortkey;
-    start_inclusive = other55.start_inclusive;
-    stop_inclusive = other55.stop_inclusive;
-    sort_key_filter_type = other55.sort_key_filter_type;
-    sort_key_filter_pattern = other55.sort_key_filter_pattern;
-    reverse = other55.reverse;
-    __isset = other55.__isset;
-}
-multi_get_request::multi_get_request(multi_get_request &&other56)
-{
-    hash_key = std::move(other56.hash_key);
-    sort_keys = std::move(other56.sort_keys);
-    max_kv_count = std::move(other56.max_kv_count);
-    max_kv_size = std::move(other56.max_kv_size);
-    no_value = std::move(other56.no_value);
-    start_sortkey = std::move(other56.start_sortkey);
-    stop_sortkey = std::move(other56.stop_sortkey);
-    start_inclusive = std::move(other56.start_inclusive);
-    stop_inclusive = std::move(other56.stop_inclusive);
-    sort_key_filter_type = std::move(other56.sort_key_filter_type);
-    sort_key_filter_pattern = std::move(other56.sort_key_filter_pattern);
-    reverse = std::move(other56.reverse);
-    __isset = std::move(other56.__isset);
-}
-multi_get_request &multi_get_request::operator=(const multi_get_request &other57)
-{
-    hash_key = other57.hash_key;
-    sort_keys = other57.sort_keys;
-    max_kv_count = other57.max_kv_count;
-    max_kv_size = other57.max_kv_size;
-    no_value = other57.no_value;
-    start_sortkey = other57.start_sortkey;
-    stop_sortkey = other57.stop_sortkey;
-    start_inclusive = other57.start_inclusive;
-    stop_inclusive = other57.stop_inclusive;
-    sort_key_filter_type = other57.sort_key_filter_type;
-    sort_key_filter_pattern = other57.sort_key_filter_pattern;
-    reverse = other57.reverse;
-    __isset = other57.__isset;
-    return *this;
-}
-multi_get_request &multi_get_request::operator=(multi_get_request &&other58)
-{
-    hash_key = std::move(other58.hash_key);
-    sort_keys = std::move(other58.sort_keys);
-    max_kv_count = std::move(other58.max_kv_count);
-    max_kv_size = std::move(other58.max_kv_size);
-    no_value = std::move(other58.no_value);
-    start_sortkey = std::move(other58.start_sortkey);
-    stop_sortkey = std::move(other58.stop_sortkey);
-    start_inclusive = std::move(other58.start_inclusive);
-    stop_inclusive = std::move(other58.stop_inclusive);
-    sort_key_filter_type = std::move(other58.sort_key_filter_type);
-    sort_key_filter_pattern = std::move(other58.sort_key_filter_pattern);
-    reverse = std::move(other58.reverse);
-    __isset = std::move(other58.__isset);
-    return *this;
-}
-void multi_get_request::printTo(std::ostream &out) const
-{
-    using ::apache::thrift::to_string;
-    out << "multi_get_request(";
-    out << "hash_key=" << to_string(hash_key);
-    out << ", "
-        << "sort_keys=" << to_string(sort_keys);
-    out << ", "
-        << "max_kv_count=" << to_string(max_kv_count);
-    out << ", "
-        << "max_kv_size=" << to_string(max_kv_size);
-    out << ", "
-        << "no_value=" << to_string(no_value);
-    out << ", "
-        << "start_sortkey=" << to_string(start_sortkey);
-    out << ", "
-        << "stop_sortkey=" << to_string(stop_sortkey);
-    out << ", "
-        << "start_inclusive=" << to_string(start_inclusive);
-    out << ", "
-        << "stop_inclusive=" << to_string(stop_inclusive);
-    out << ", "
-        << "sort_key_filter_type=" << to_string(sort_key_filter_type);
-    out << ", "
-        << "sort_key_filter_pattern=" << to_string(sort_key_filter_pattern);
-    out << ", "
-        << "reverse=" << to_string(reverse);
-    out << ")";
+void swap(read_response &a, read_response &b) {
+  using ::std::swap;
+  swap(a.error, b.error);
+  swap(a.value, b.value);
+  swap(a.app_id, b.app_id);
+  swap(a.partition_index, b.partition_index);
+  swap(a.server, b.server);
+  swap(a.__isset, b.__isset);
 }
 
-multi_get_response::~multi_get_response() throw() {}
+read_response::read_response(const read_response& other8) {
+  error = other8.error;
+  value = other8.value;
+  app_id = other8.app_id;
+  partition_index = other8.partition_index;
+  server = other8.server;
+  __isset = other8.__isset;
+}
+read_response::read_response( read_response&& other9) {
+  error = std::move(other9.error);
+  value = std::move(other9.value);
+  app_id = std::move(other9.app_id);
+  partition_index = std::move(other9.partition_index);
+  server = std::move(other9.server);
+  __isset = std::move(other9.__isset);
+}
+read_response& read_response::operator=(const read_response& other10) {
+  error = other10.error;
+  value = other10.value;
+  app_id = other10.app_id;
+  partition_index = other10.partition_index;
+  server = other10.server;
+  __isset = other10.__isset;
+  return *this;
+}
+read_response& read_response::operator=(read_response&& other11) {
+  error = std::move(other11.error);
+  value = std::move(other11.value);
+  app_id = std::move(other11.app_id);
+  partition_index = std::move(other11.partition_index);
+  server = std::move(other11.server);
+  __isset = std::move(other11.__isset);
+  return *this;
+}
+void read_response::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "read_response(";
+  out << "error=" << to_string(error);
+  out << ", " << "value=" << to_string(value);
+  out << ", " << "app_id=" << to_string(app_id);
+  out << ", " << "partition_index=" << to_string(partition_index);
+  out << ", " << "server=" << to_string(server);
+  out << ")";
+}
 
-void multi_get_response::__set_error(const int32_t val) { this->error = val; }
 
-void multi_get_response::__set_kvs(const std::vector<key_value> &val) { this->kvs = val; }
+ttl_response::~ttl_response() throw() {
+}
 
-void multi_get_response::__set_app_id(const int32_t val) { this->app_id = val; }
 
-void multi_get_response::__set_partition_index(const int32_t val) { this->partition_index = val; }
+void ttl_response::__set_error(const int32_t val) {
+  this->error = val;
+}
 
-void multi_get_response::__set_server(const std::string &val) { this->server = val; }
+void ttl_response::__set_ttl_seconds(const int32_t val) {
+  this->ttl_seconds = val;
+}
 
-uint32_t multi_get_response::read(::apache::thrift::protocol::TProtocol *iprot)
-{
+void ttl_response::__set_app_id(const int32_t val) {
+  this->app_id = val;
+}
 
-    apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+void ttl_response::__set_partition_index(const int32_t val) {
+  this->partition_index = val;
+}
 
-    xfer += iprot->readStructBegin(fname);
+void ttl_response::__set_server(const std::string& val) {
+  this->server = val;
+}
 
-    using ::apache::thrift::protocol::TProtocolException;
+uint32_t ttl_response::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-        case 1:
-            if (ftype == ::apache::thrift::protocol::T_I32) {
-                xfer += iprot->readI32(this->error);
-                this->__isset.error = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 2:
-            if (ftype == ::apache::thrift::protocol::T_LIST) {
-                {
-                    this->kvs.clear();
-                    uint32_t _size59;
-                    ::apache::thrift::protocol::TType _etype62;
-                    xfer += iprot->readListBegin(_etype62, _size59);
-                    this->kvs.resize(_size59);
-                    uint32_t _i63;
-                    for (_i63 = 0; _i63 < _size59; ++_i63) {
-                        xfer += this->kvs[_i63].read(iprot);
-                    }
-                    xfer += iprot->readListEnd();
-                }
-                this->__isset.kvs = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 3:
-            if (ftype == ::apache::thrift::protocol::T_I32) {
-                xfer += iprot->readI32(this->app_id);
-                this->__isset.app_id = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 4:
-            if (ftype == ::apache::thrift::protocol::T_I32) {
-                xfer += iprot->readI32(this->partition_index);
-                this->__isset.partition_index = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 6:
-            if (ftype == ::apache::thrift::protocol::T_STRING) {
-                xfer += iprot->readString(this->server);
-                this->__isset.server = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        default:
-            xfer += iprot->skip(ftype);
-            break;
-        }
-        xfer += iprot->readFieldEnd();
+  apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
     }
-
-    xfer += iprot->readStructEnd();
-
-    return xfer;
-}
-
-uint32_t multi_get_response::write(::apache::thrift::protocol::TProtocol *oprot) const
-{
-    uint32_t xfer = 0;
-    apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("multi_get_response");
-
-    xfer += oprot->writeFieldBegin("error", ::apache::thrift::protocol::T_I32, 1);
-    xfer += oprot->writeI32(this->error);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("kvs", ::apache::thrift::protocol::T_LIST, 2);
+    switch (fid)
     {
-        xfer += oprot->writeListBegin(::apache::thrift::protocol::T_STRUCT,
-                                      static_cast<uint32_t>(this->kvs.size()));
-        std::vector<key_value>::const_iterator _iter64;
-        for (_iter64 = this->kvs.begin(); _iter64 != this->kvs.end(); ++_iter64) {
-            xfer += (*_iter64).write(oprot);
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_I32) {
+          xfer += iprot->readI32(this->error);
+          this->__isset.error = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += oprot->writeListEnd();
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_I32) {
+          xfer += iprot->readI32(this->ttl_seconds);
+          this->__isset.ttl_seconds = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 3:
+        if (ftype == ::apache::thrift::protocol::T_I32) {
+          xfer += iprot->readI32(this->app_id);
+          this->__isset.app_id = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 4:
+        if (ftype == ::apache::thrift::protocol::T_I32) {
+          xfer += iprot->readI32(this->partition_index);
+          this->__isset.partition_index = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 6:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->server);
+          this->__isset.server = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
-    xfer += oprot->writeFieldEnd();
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += oprot->writeFieldBegin("app_id", ::apache::thrift::protocol::T_I32, 3);
-    xfer += oprot->writeI32(this->app_id);
-    xfer += oprot->writeFieldEnd();
+  xfer += iprot->readStructEnd();
 
-    xfer += oprot->writeFieldBegin("partition_index", ::apache::thrift::protocol::T_I32, 4);
-    xfer += oprot->writeI32(this->partition_index);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("server", ::apache::thrift::protocol::T_STRING, 6);
-    xfer += oprot->writeString(this->server);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  return xfer;
 }
 
-void swap(multi_get_response &a, multi_get_response &b)
-{
-    using ::std::swap;
-    swap(a.error, b.error);
-    swap(a.kvs, b.kvs);
-    swap(a.app_id, b.app_id);
-    swap(a.partition_index, b.partition_index);
-    swap(a.server, b.server);
-    swap(a.__isset, b.__isset);
+uint32_t ttl_response::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("ttl_response");
+
+  xfer += oprot->writeFieldBegin("error", ::apache::thrift::protocol::T_I32, 1);
+  xfer += oprot->writeI32(this->error);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("ttl_seconds", ::apache::thrift::protocol::T_I32, 2);
+  xfer += oprot->writeI32(this->ttl_seconds);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("app_id", ::apache::thrift::protocol::T_I32, 3);
+  xfer += oprot->writeI32(this->app_id);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("partition_index", ::apache::thrift::protocol::T_I32, 4);
+  xfer += oprot->writeI32(this->partition_index);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("server", ::apache::thrift::protocol::T_STRING, 6);
+  xfer += oprot->writeString(this->server);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
 
-multi_get_response::multi_get_response(const multi_get_response &other65)
-{
-    error = other65.error;
-    kvs = other65.kvs;
-    app_id = other65.app_id;
-    partition_index = other65.partition_index;
-    server = other65.server;
-    __isset = other65.__isset;
-}
-multi_get_response::multi_get_response(multi_get_response &&other66)
-{
-    error = std::move(other66.error);
-    kvs = std::move(other66.kvs);
-    app_id = std::move(other66.app_id);
-    partition_index = std::move(other66.partition_index);
-    server = std::move(other66.server);
-    __isset = std::move(other66.__isset);
-}
-multi_get_response &multi_get_response::operator=(const multi_get_response &other67)
-{
-    error = other67.error;
-    kvs = other67.kvs;
-    app_id = other67.app_id;
-    partition_index = other67.partition_index;
-    server = other67.server;
-    __isset = other67.__isset;
-    return *this;
-}
-multi_get_response &multi_get_response::operator=(multi_get_response &&other68)
-{
-    error = std::move(other68.error);
-    kvs = std::move(other68.kvs);
-    app_id = std::move(other68.app_id);
-    partition_index = std::move(other68.partition_index);
-    server = std::move(other68.server);
-    __isset = std::move(other68.__isset);
-    return *this;
-}
-void multi_get_response::printTo(std::ostream &out) const
-{
-    using ::apache::thrift::to_string;
-    out << "multi_get_response(";
-    out << "error=" << to_string(error);
-    out << ", "
-        << "kvs=" << to_string(kvs);
-    out << ", "
-        << "app_id=" << to_string(app_id);
-    out << ", "
-        << "partition_index=" << to_string(partition_index);
-    out << ", "
-        << "server=" << to_string(server);
-    out << ")";
+void swap(ttl_response &a, ttl_response &b) {
+  using ::std::swap;
+  swap(a.error, b.error);
+  swap(a.ttl_seconds, b.ttl_seconds);
+  swap(a.app_id, b.app_id);
+  swap(a.partition_index, b.partition_index);
+  swap(a.server, b.server);
+  swap(a.__isset, b.__isset);
 }
 
-incr_request::~incr_request() throw() {}
+ttl_response::ttl_response(const ttl_response& other12) {
+  error = other12.error;
+  ttl_seconds = other12.ttl_seconds;
+  app_id = other12.app_id;
+  partition_index = other12.partition_index;
+  server = other12.server;
+  __isset = other12.__isset;
+}
+ttl_response::ttl_response( ttl_response&& other13) {
+  error = std::move(other13.error);
+  ttl_seconds = std::move(other13.ttl_seconds);
+  app_id = std::move(other13.app_id);
+  partition_index = std::move(other13.partition_index);
+  server = std::move(other13.server);
+  __isset = std::move(other13.__isset);
+}
+ttl_response& ttl_response::operator=(const ttl_response& other14) {
+  error = other14.error;
+  ttl_seconds = other14.ttl_seconds;
+  app_id = other14.app_id;
+  partition_index = other14.partition_index;
+  server = other14.server;
+  __isset = other14.__isset;
+  return *this;
+}
+ttl_response& ttl_response::operator=(ttl_response&& other15) {
+  error = std::move(other15.error);
+  ttl_seconds = std::move(other15.ttl_seconds);
+  app_id = std::move(other15.app_id);
+  partition_index = std::move(other15.partition_index);
+  server = std::move(other15.server);
+  __isset = std::move(other15.__isset);
+  return *this;
+}
+void ttl_response::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "ttl_response(";
+  out << "error=" << to_string(error);
+  out << ", " << "ttl_seconds=" << to_string(ttl_seconds);
+  out << ", " << "app_id=" << to_string(app_id);
+  out << ", " << "partition_index=" << to_string(partition_index);
+  out << ", " << "server=" << to_string(server);
+  out << ")";
+}
 
-void incr_request::__set_key(const ::dsn::blob &val) { this->key = val; }
 
-void incr_request::__set_increment(const int64_t val) { this->increment = val; }
+count_response::~count_response() throw() {
+}
 
-uint32_t incr_request::read(::apache::thrift::protocol::TProtocol *iprot)
-{
 
-    apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+void count_response::__set_error(const int32_t val) {
+  this->error = val;
+}
 
-    xfer += iprot->readStructBegin(fname);
+void count_response::__set_count(const int64_t val) {
+  this->count = val;
+}
 
-    using ::apache::thrift::protocol::TProtocolException;
+void count_response::__set_app_id(const int32_t val) {
+  this->app_id = val;
+}
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-        case 1:
-            if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                xfer += this->key.read(iprot);
-                this->__isset.key = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 2:
-            if (ftype == ::apache::thrift::protocol::T_I64) {
-                xfer += iprot->readI64(this->increment);
-                this->__isset.increment = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        default:
-            xfer += iprot->skip(ftype);
-            break;
-        }
-        xfer += iprot->readFieldEnd();
+void count_response::__set_partition_index(const int32_t val) {
+  this->partition_index = val;
+}
+
+void count_response::__set_server(const std::string& val) {
+  this->server = val;
+}
+
+uint32_t count_response::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
     }
-
-    xfer += iprot->readStructEnd();
-
-    return xfer;
-}
-
-uint32_t incr_request::write(::apache::thrift::protocol::TProtocol *oprot) const
-{
-    uint32_t xfer = 0;
-    apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("incr_request");
-
-    xfer += oprot->writeFieldBegin("key", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->key.write(oprot);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("increment", ::apache::thrift::protocol::T_I64, 2);
-    xfer += oprot->writeI64(this->increment);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
-}
-
-void swap(incr_request &a, incr_request &b)
-{
-    using ::std::swap;
-    swap(a.key, b.key);
-    swap(a.increment, b.increment);
-    swap(a.__isset, b.__isset);
-}
-
-incr_request::incr_request(const incr_request &other69)
-{
-    key = other69.key;
-    increment = other69.increment;
-    __isset = other69.__isset;
-}
-incr_request::incr_request(incr_request &&other70)
-{
-    key = std::move(other70.key);
-    increment = std::move(other70.increment);
-    __isset = std::move(other70.__isset);
-}
-incr_request &incr_request::operator=(const incr_request &other71)
-{
-    key = other71.key;
-    increment = other71.increment;
-    __isset = other71.__isset;
-    return *this;
-}
-incr_request &incr_request::operator=(incr_request &&other72)
-{
-    key = std::move(other72.key);
-    increment = std::move(other72.increment);
-    __isset = std::move(other72.__isset);
-    return *this;
-}
-void incr_request::printTo(std::ostream &out) const
-{
-    using ::apache::thrift::to_string;
-    out << "incr_request(";
-    out << "key=" << to_string(key);
-    out << ", "
-        << "increment=" << to_string(increment);
-    out << ")";
-}
-
-get_scanner_request::~get_scanner_request() throw() {}
-
-void get_scanner_request::__set_start_key(const ::dsn::blob &val) { this->start_key = val; }
-
-void get_scanner_request::__set_stop_key(const ::dsn::blob &val) { this->stop_key = val; }
-
-void get_scanner_request::__set_start_inclusive(const bool val) { this->start_inclusive = val; }
-
-void get_scanner_request::__set_stop_inclusive(const bool val) { this->stop_inclusive = val; }
-
-void get_scanner_request::__set_batch_size(const int32_t val) { this->batch_size = val; }
-
-void get_scanner_request::__set_no_value(const bool val) { this->no_value = val; }
-
-void get_scanner_request::__set_hash_key_filter_type(const filter_type::type val)
-{
-    this->hash_key_filter_type = val;
-}
-
-void get_scanner_request::__set_hash_key_filter_pattern(const ::dsn::blob &val)
-{
-    this->hash_key_filter_pattern = val;
-}
-
-void get_scanner_request::__set_sort_key_filter_type(const filter_type::type val)
-{
-    this->sort_key_filter_type = val;
-}
-
-void get_scanner_request::__set_sort_key_filter_pattern(const ::dsn::blob &val)
-{
-    this->sort_key_filter_pattern = val;
-}
-
-uint32_t get_scanner_request::read(::apache::thrift::protocol::TProtocol *iprot)
-{
-
-    apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
-
-    xfer += iprot->readStructBegin(fname);
-
-    using ::apache::thrift::protocol::TProtocolException;
-
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-        case 1:
-            if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                xfer += this->start_key.read(iprot);
-                this->__isset.start_key = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 2:
-            if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                xfer += this->stop_key.read(iprot);
-                this->__isset.stop_key = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 3:
-            if (ftype == ::apache::thrift::protocol::T_BOOL) {
-                xfer += iprot->readBool(this->start_inclusive);
-                this->__isset.start_inclusive = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 4:
-            if (ftype == ::apache::thrift::protocol::T_BOOL) {
-                xfer += iprot->readBool(this->stop_inclusive);
-                this->__isset.stop_inclusive = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 5:
-            if (ftype == ::apache::thrift::protocol::T_I32) {
-                xfer += iprot->readI32(this->batch_size);
-                this->__isset.batch_size = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 6:
-            if (ftype == ::apache::thrift::protocol::T_BOOL) {
-                xfer += iprot->readBool(this->no_value);
-                this->__isset.no_value = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 7:
-            if (ftype == ::apache::thrift::protocol::T_I32) {
-                int32_t ecast73;
-                xfer += iprot->readI32(ecast73);
-                this->hash_key_filter_type = (filter_type::type)ecast73;
-                this->__isset.hash_key_filter_type = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 8:
-            if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                xfer += this->hash_key_filter_pattern.read(iprot);
-                this->__isset.hash_key_filter_pattern = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 9:
-            if (ftype == ::apache::thrift::protocol::T_I32) {
-                int32_t ecast74;
-                xfer += iprot->readI32(ecast74);
-                this->sort_key_filter_type = (filter_type::type)ecast74;
-                this->__isset.sort_key_filter_type = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 10:
-            if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                xfer += this->sort_key_filter_pattern.read(iprot);
-                this->__isset.sort_key_filter_pattern = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        default:
-            xfer += iprot->skip(ftype);
-            break;
-        }
-        xfer += iprot->readFieldEnd();
-    }
-
-    xfer += iprot->readStructEnd();
-
-    return xfer;
-}
-
-uint32_t get_scanner_request::write(::apache::thrift::protocol::TProtocol *oprot) const
-{
-    uint32_t xfer = 0;
-    apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("get_scanner_request");
-
-    xfer += oprot->writeFieldBegin("start_key", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->start_key.write(oprot);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("stop_key", ::apache::thrift::protocol::T_STRUCT, 2);
-    xfer += this->stop_key.write(oprot);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("start_inclusive", ::apache::thrift::protocol::T_BOOL, 3);
-    xfer += oprot->writeBool(this->start_inclusive);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("stop_inclusive", ::apache::thrift::protocol::T_BOOL, 4);
-    xfer += oprot->writeBool(this->stop_inclusive);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("batch_size", ::apache::thrift::protocol::T_I32, 5);
-    xfer += oprot->writeI32(this->batch_size);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("no_value", ::apache::thrift::protocol::T_BOOL, 6);
-    xfer += oprot->writeBool(this->no_value);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("hash_key_filter_type", ::apache::thrift::protocol::T_I32, 7);
-    xfer += oprot->writeI32((int32_t)this->hash_key_filter_type);
-    xfer += oprot->writeFieldEnd();
-
-    xfer +=
-        oprot->writeFieldBegin("hash_key_filter_pattern", ::apache::thrift::protocol::T_STRUCT, 8);
-    xfer += this->hash_key_filter_pattern.write(oprot);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("sort_key_filter_type", ::apache::thrift::protocol::T_I32, 9);
-    xfer += oprot->writeI32((int32_t)this->sort_key_filter_type);
-    xfer += oprot->writeFieldEnd();
-
-    xfer +=
-        oprot->writeFieldBegin("sort_key_filter_pattern", ::apache::thrift::protocol::T_STRUCT, 10);
-    xfer += this->sort_key_filter_pattern.write(oprot);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
-}
-
-void swap(get_scanner_request &a, get_scanner_request &b)
-{
-    using ::std::swap;
-    swap(a.start_key, b.start_key);
-    swap(a.stop_key, b.stop_key);
-    swap(a.start_inclusive, b.start_inclusive);
-    swap(a.stop_inclusive, b.stop_inclusive);
-    swap(a.batch_size, b.batch_size);
-    swap(a.no_value, b.no_value);
-    swap(a.hash_key_filter_type, b.hash_key_filter_type);
-    swap(a.hash_key_filter_pattern, b.hash_key_filter_pattern);
-    swap(a.sort_key_filter_type, b.sort_key_filter_type);
-    swap(a.sort_key_filter_pattern, b.sort_key_filter_pattern);
-    swap(a.__isset, b.__isset);
-}
-
-get_scanner_request::get_scanner_request(const get_scanner_request &other75)
-{
-    start_key = other75.start_key;
-    stop_key = other75.stop_key;
-    start_inclusive = other75.start_inclusive;
-    stop_inclusive = other75.stop_inclusive;
-    batch_size = other75.batch_size;
-    no_value = other75.no_value;
-    hash_key_filter_type = other75.hash_key_filter_type;
-    hash_key_filter_pattern = other75.hash_key_filter_pattern;
-    sort_key_filter_type = other75.sort_key_filter_type;
-    sort_key_filter_pattern = other75.sort_key_filter_pattern;
-    __isset = other75.__isset;
-}
-get_scanner_request::get_scanner_request(get_scanner_request &&other76)
-{
-    start_key = std::move(other76.start_key);
-    stop_key = std::move(other76.stop_key);
-    start_inclusive = std::move(other76.start_inclusive);
-    stop_inclusive = std::move(other76.stop_inclusive);
-    batch_size = std::move(other76.batch_size);
-    no_value = std::move(other76.no_value);
-    hash_key_filter_type = std::move(other76.hash_key_filter_type);
-    hash_key_filter_pattern = std::move(other76.hash_key_filter_pattern);
-    sort_key_filter_type = std::move(other76.sort_key_filter_type);
-    sort_key_filter_pattern = std::move(other76.sort_key_filter_pattern);
-    __isset = std::move(other76.__isset);
-}
-get_scanner_request &get_scanner_request::operator=(const get_scanner_request &other77)
-{
-    start_key = other77.start_key;
-    stop_key = other77.stop_key;
-    start_inclusive = other77.start_inclusive;
-    stop_inclusive = other77.stop_inclusive;
-    batch_size = other77.batch_size;
-    no_value = other77.no_value;
-    hash_key_filter_type = other77.hash_key_filter_type;
-    hash_key_filter_pattern = other77.hash_key_filter_pattern;
-    sort_key_filter_type = other77.sort_key_filter_type;
-    sort_key_filter_pattern = other77.sort_key_filter_pattern;
-    __isset = other77.__isset;
-    return *this;
-}
-get_scanner_request &get_scanner_request::operator=(get_scanner_request &&other78)
-{
-    start_key = std::move(other78.start_key);
-    stop_key = std::move(other78.stop_key);
-    start_inclusive = std::move(other78.start_inclusive);
-    stop_inclusive = std::move(other78.stop_inclusive);
-    batch_size = std::move(other78.batch_size);
-    no_value = std::move(other78.no_value);
-    hash_key_filter_type = std::move(other78.hash_key_filter_type);
-    hash_key_filter_pattern = std::move(other78.hash_key_filter_pattern);
-    sort_key_filter_type = std::move(other78.sort_key_filter_type);
-    sort_key_filter_pattern = std::move(other78.sort_key_filter_pattern);
-    __isset = std::move(other78.__isset);
-    return *this;
-}
-void get_scanner_request::printTo(std::ostream &out) const
-{
-    using ::apache::thrift::to_string;
-    out << "get_scanner_request(";
-    out << "start_key=" << to_string(start_key);
-    out << ", "
-        << "stop_key=" << to_string(stop_key);
-    out << ", "
-        << "start_inclusive=" << to_string(start_inclusive);
-    out << ", "
-        << "stop_inclusive=" << to_string(stop_inclusive);
-    out << ", "
-        << "batch_size=" << to_string(batch_size);
-    out << ", "
-        << "no_value=" << to_string(no_value);
-    out << ", "
-        << "hash_key_filter_type=" << to_string(hash_key_filter_type);
-    out << ", "
-        << "hash_key_filter_pattern=" << to_string(hash_key_filter_pattern);
-    out << ", "
-        << "sort_key_filter_type=" << to_string(sort_key_filter_type);
-    out << ", "
-        << "sort_key_filter_pattern=" << to_string(sort_key_filter_pattern);
-    out << ")";
-}
-
-scan_request::~scan_request() throw() {}
-
-void scan_request::__set_context_id(const int64_t val) { this->context_id = val; }
-
-uint32_t scan_request::read(::apache::thrift::protocol::TProtocol *iprot)
-{
-
-    apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
-
-    xfer += iprot->readStructBegin(fname);
-
-    using ::apache::thrift::protocol::TProtocolException;
-
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-        case 1:
-            if (ftype == ::apache::thrift::protocol::T_I64) {
-                xfer += iprot->readI64(this->context_id);
-                this->__isset.context_id = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        default:
-            xfer += iprot->skip(ftype);
-            break;
-        }
-        xfer += iprot->readFieldEnd();
-    }
-
-    xfer += iprot->readStructEnd();
-
-    return xfer;
-}
-
-uint32_t scan_request::write(::apache::thrift::protocol::TProtocol *oprot) const
-{
-    uint32_t xfer = 0;
-    apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("scan_request");
-
-    xfer += oprot->writeFieldBegin("context_id", ::apache::thrift::protocol::T_I64, 1);
-    xfer += oprot->writeI64(this->context_id);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
-}
-
-void swap(scan_request &a, scan_request &b)
-{
-    using ::std::swap;
-    swap(a.context_id, b.context_id);
-    swap(a.__isset, b.__isset);
-}
-
-scan_request::scan_request(const scan_request &other79)
-{
-    context_id = other79.context_id;
-    __isset = other79.__isset;
-}
-scan_request::scan_request(scan_request &&other80)
-{
-    context_id = std::move(other80.context_id);
-    __isset = std::move(other80.__isset);
-}
-scan_request &scan_request::operator=(const scan_request &other81)
-{
-    context_id = other81.context_id;
-    __isset = other81.__isset;
-    return *this;
-}
-scan_request &scan_request::operator=(scan_request &&other82)
-{
-    context_id = std::move(other82.context_id);
-    __isset = std::move(other82.__isset);
-    return *this;
-}
-void scan_request::printTo(std::ostream &out) const
-{
-    using ::apache::thrift::to_string;
-    out << "scan_request(";
-    out << "context_id=" << to_string(context_id);
-    out << ")";
-}
-
-scan_response::~scan_response() throw() {}
-
-void scan_response::__set_error(const int32_t val) { this->error = val; }
-
-void scan_response::__set_kvs(const std::vector<key_value> &val) { this->kvs = val; }
-
-void scan_response::__set_context_id(const int64_t val) { this->context_id = val; }
-
-void scan_response::__set_app_id(const int32_t val) { this->app_id = val; }
-
-void scan_response::__set_partition_index(const int32_t val) { this->partition_index = val; }
-
-void scan_response::__set_server(const std::string &val) { this->server = val; }
-
-uint32_t scan_response::read(::apache::thrift::protocol::TProtocol *iprot)
-{
-
-    apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
-
-    xfer += iprot->readStructBegin(fname);
-
-    using ::apache::thrift::protocol::TProtocolException;
-
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-        case 1:
-            if (ftype == ::apache::thrift::protocol::T_I32) {
-                xfer += iprot->readI32(this->error);
-                this->__isset.error = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 2:
-            if (ftype == ::apache::thrift::protocol::T_LIST) {
-                {
-                    this->kvs.clear();
-                    uint32_t _size83;
-                    ::apache::thrift::protocol::TType _etype86;
-                    xfer += iprot->readListBegin(_etype86, _size83);
-                    this->kvs.resize(_size83);
-                    uint32_t _i87;
-                    for (_i87 = 0; _i87 < _size83; ++_i87) {
-                        xfer += this->kvs[_i87].read(iprot);
-                    }
-                    xfer += iprot->readListEnd();
-                }
-                this->__isset.kvs = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 3:
-            if (ftype == ::apache::thrift::protocol::T_I64) {
-                xfer += iprot->readI64(this->context_id);
-                this->__isset.context_id = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 4:
-            if (ftype == ::apache::thrift::protocol::T_I32) {
-                xfer += iprot->readI32(this->app_id);
-                this->__isset.app_id = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 5:
-            if (ftype == ::apache::thrift::protocol::T_I32) {
-                xfer += iprot->readI32(this->partition_index);
-                this->__isset.partition_index = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        case 6:
-            if (ftype == ::apache::thrift::protocol::T_STRING) {
-                xfer += iprot->readString(this->server);
-                this->__isset.server = true;
-            } else {
-                xfer += iprot->skip(ftype);
-            }
-            break;
-        default:
-            xfer += iprot->skip(ftype);
-            break;
-        }
-        xfer += iprot->readFieldEnd();
-    }
-
-    xfer += iprot->readStructEnd();
-
-    return xfer;
-}
-
-uint32_t scan_response::write(::apache::thrift::protocol::TProtocol *oprot) const
-{
-    uint32_t xfer = 0;
-    apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("scan_response");
-
-    xfer += oprot->writeFieldBegin("error", ::apache::thrift::protocol::T_I32, 1);
-    xfer += oprot->writeI32(this->error);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("kvs", ::apache::thrift::protocol::T_LIST, 2);
+    switch (fid)
     {
-        xfer += oprot->writeListBegin(::apache::thrift::protocol::T_STRUCT,
-                                      static_cast<uint32_t>(this->kvs.size()));
-        std::vector<key_value>::const_iterator _iter88;
-        for (_iter88 = this->kvs.begin(); _iter88 != this->kvs.end(); ++_iter88) {
-            xfer += (*_iter88).write(oprot);
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_I32) {
+          xfer += iprot->readI32(this->error);
+          this->__isset.error = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += oprot->writeListEnd();
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->count);
+          this->__isset.count = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 3:
+        if (ftype == ::apache::thrift::protocol::T_I32) {
+          xfer += iprot->readI32(this->app_id);
+          this->__isset.app_id = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 4:
+        if (ftype == ::apache::thrift::protocol::T_I32) {
+          xfer += iprot->readI32(this->partition_index);
+          this->__isset.partition_index = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 6:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->server);
+          this->__isset.server = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
-    xfer += oprot->writeFieldEnd();
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += oprot->writeFieldBegin("context_id", ::apache::thrift::protocol::T_I64, 3);
-    xfer += oprot->writeI64(this->context_id);
-    xfer += oprot->writeFieldEnd();
+  xfer += iprot->readStructEnd();
 
-    xfer += oprot->writeFieldBegin("app_id", ::apache::thrift::protocol::T_I32, 4);
-    xfer += oprot->writeI32(this->app_id);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("partition_index", ::apache::thrift::protocol::T_I32, 5);
-    xfer += oprot->writeI32(this->partition_index);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldBegin("server", ::apache::thrift::protocol::T_STRING, 6);
-    xfer += oprot->writeString(this->server);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  return xfer;
 }
 
-void swap(scan_response &a, scan_response &b)
-{
-    using ::std::swap;
-    swap(a.error, b.error);
-    swap(a.kvs, b.kvs);
-    swap(a.context_id, b.context_id);
-    swap(a.app_id, b.app_id);
-    swap(a.partition_index, b.partition_index);
-    swap(a.server, b.server);
-    swap(a.__isset, b.__isset);
+uint32_t count_response::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("count_response");
+
+  xfer += oprot->writeFieldBegin("error", ::apache::thrift::protocol::T_I32, 1);
+  xfer += oprot->writeI32(this->error);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("count", ::apache::thrift::protocol::T_I64, 2);
+  xfer += oprot->writeI64(this->count);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("app_id", ::apache::thrift::protocol::T_I32, 3);
+  xfer += oprot->writeI32(this->app_id);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("partition_index", ::apache::thrift::protocol::T_I32, 4);
+  xfer += oprot->writeI32(this->partition_index);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("server", ::apache::thrift::protocol::T_STRING, 6);
+  xfer += oprot->writeString(this->server);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
 
-scan_response::scan_response(const scan_response &other89)
-{
-    error = other89.error;
-    kvs = other89.kvs;
-    context_id = other89.context_id;
-    app_id = other89.app_id;
-    partition_index = other89.partition_index;
-    server = other89.server;
-    __isset = other89.__isset;
+void swap(count_response &a, count_response &b) {
+  using ::std::swap;
+  swap(a.error, b.error);
+  swap(a.count, b.count);
+  swap(a.app_id, b.app_id);
+  swap(a.partition_index, b.partition_index);
+  swap(a.server, b.server);
+  swap(a.__isset, b.__isset);
 }
-scan_response::scan_response(scan_response &&other90)
-{
-    error = std::move(other90.error);
-    kvs = std::move(other90.kvs);
-    context_id = std::move(other90.context_id);
-    app_id = std::move(other90.app_id);
-    partition_index = std::move(other90.partition_index);
-    server = std::move(other90.server);
-    __isset = std::move(other90.__isset);
+
+count_response::count_response(const count_response& other16) {
+  error = other16.error;
+  count = other16.count;
+  app_id = other16.app_id;
+  partition_index = other16.partition_index;
+  server = other16.server;
+  __isset = other16.__isset;
 }
-scan_response &scan_response::operator=(const scan_response &other91)
-{
-    error = other91.error;
-    kvs = other91.kvs;
-    context_id = other91.context_id;
-    app_id = other91.app_id;
-    partition_index = other91.partition_index;
-    server = other91.server;
-    __isset = other91.__isset;
-    return *this;
+count_response::count_response( count_response&& other17) {
+  error = std::move(other17.error);
+  count = std::move(other17.count);
+  app_id = std::move(other17.app_id);
+  partition_index = std::move(other17.partition_index);
+  server = std::move(other17.server);
+  __isset = std::move(other17.__isset);
 }
-scan_response &scan_response::operator=(scan_response &&other92)
-{
-    error = std::move(other92.error);
-    kvs = std::move(other92.kvs);
-    context_id = std::move(other92.context_id);
-    app_id = std::move(other92.app_id);
-    partition_index = std::move(other92.partition_index);
-    server = std::move(other92.server);
-    __isset = std::move(other92.__isset);
-    return *this;
+count_response& count_response::operator=(const count_response& other18) {
+  error = other18.error;
+  count = other18.count;
+  app_id = other18.app_id;
+  partition_index = other18.partition_index;
+  server = other18.server;
+  __isset = other18.__isset;
+  return *this;
 }
-void scan_response::printTo(std::ostream &out) const
-{
-    using ::apache::thrift::to_string;
-    out << "scan_response(";
-    out << "error=" << to_string(error);
-    out << ", "
-        << "kvs=" << to_string(kvs);
-    out << ", "
-        << "context_id=" << to_string(context_id);
-    out << ", "
-        << "app_id=" << to_string(app_id);
-    out << ", "
-        << "partition_index=" << to_string(partition_index);
-    out << ", "
-        << "server=" << to_string(server);
-    out << ")";
+count_response& count_response::operator=(count_response&& other19) {
+  error = std::move(other19.error);
+  count = std::move(other19.count);
+  app_id = std::move(other19.app_id);
+  partition_index = std::move(other19.partition_index);
+  server = std::move(other19.server);
+  __isset = std::move(other19.__isset);
+  return *this;
 }
+void count_response::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "count_response(";
+  out << "error=" << to_string(error);
+  out << ", " << "count=" << to_string(count);
+  out << ", " << "app_id=" << to_string(app_id);
+  out << ", " << "partition_index=" << to_string(partition_index);
+  out << ", " << "server=" << to_string(server);
+  out << ")";
 }
-} // namespace
+
+
+key_value::~key_value() throw() {
+}
+
+
+void key_value::__set_key(const  ::dsn::blob& val) {
+  this->key = val;
+}
+
+void key_value::__set_value(const  ::dsn::blob& val) {
+  this->value = val;
+}
+
+uint32_t key_value::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->key.read(iprot);
+          this->__isset.key = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->value.read(iprot);
+          this->__isset.value = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t key_value::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("key_value");
+
+  xfer += oprot->writeFieldBegin("key", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->key.write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("value", ::apache::thrift::protocol::T_STRUCT, 2);
+  xfer += this->value.write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+void swap(key_value &a, key_value &b) {
+  using ::std::swap;
+  swap(a.key, b.key);
+  swap(a.value, b.value);
+  swap(a.__isset, b.__isset);
+}
+
+key_value::key_value(const key_value& other20) {
+  key = other20.key;
+  value = other20.value;
+  __isset = other20.__isset;
+}
+key_value::key_value( key_value&& other21) {
+  key = std::move(other21.key);
+  value = std::move(other21.value);
+  __isset = std::move(other21.__isset);
+}
+key_value& key_value::operator=(const key_value& other22) {
+  key = other22.key;
+  value = other22.value;
+  __isset = other22.__isset;
+  return *this;
+}
+key_value& key_value::operator=(key_value&& other23) {
+  key = std::move(other23.key);
+  value = std::move(other23.value);
+  __isset = std::move(other23.__isset);
+  return *this;
+}
+void key_value::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "key_value(";
+  out << "key=" << to_string(key);
+  out << ", " << "value=" << to_string(value);
+  out << ")";
+}
+
+
+multi_put_request::~multi_put_request() throw() {
+}
+
+
+void multi_put_request::__set_hash_key(const  ::dsn::blob& val) {
+  this->hash_key = val;
+}
+
+void multi_put_request::__set_kvs(const std::vector<key_value> & val) {
+  this->kvs = val;
+}
+
+void multi_put_request::__set_expire_ts_seconds(const int32_t val) {
+  this->expire_ts_seconds = val;
+}
+
+uint32_t multi_put_request::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->hash_key.read(iprot);
+          this->__isset.hash_key = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_LIST) {
+          {
+            this->kvs.clear();
+            uint32_t _size24;
+            ::apache::thrift::protocol::TType _etype27;
+            xfer += iprot->readListBegin(_etype27, _size24);
+            this->kvs.resize(_size24);
+            uint32_t _i28;
+            for (_i28 = 0; _i28 < _size24; ++_i28)
+            {
+              xfer += this->kvs[_i28].read(iprot);
+            }
+            xfer += iprot->readListEnd();
+          }
+          this->__isset.kvs = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 3:
+        if (ftype == ::apache::thrift::protocol::T_I32) {
+          xfer += iprot->readI32(this->expire_ts_seconds);
+          this->__isset.expire_ts_seconds = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t multi_put_request::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("multi_put_request");
+
+  xfer += oprot->writeFieldBegin("hash_key", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->hash_key.write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("kvs", ::apache::thrift::protocol::T_LIST, 2);
+  {
+    xfer += oprot->writeListBegin(::apache::thrift::protocol::T_STRUCT, static_cast<uint32_t>(this->kvs.size()));
+    std::vector<key_value> ::const_iterator _iter29;
+    for (_iter29 = this->kvs.begin(); _iter29 != this->kvs.end(); ++_iter29)
+    {
+      xfer += (*_iter29).write(oprot);
+    }
+    xfer += oprot->writeListEnd();
+  }
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("expire_ts_seconds", ::apache::thrift::protocol::T_I32, 3);
+  xfer += oprot->writeI32(this->expire_ts_seconds);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+void swap(multi_put_request &a, multi_put_request &b) {
+  using ::std::swap;
+  swap(a.hash_key, b.hash_key);
+  swap(a.kvs, b.kvs);
+  swap(a.expire_ts_seconds, b.expire_ts_seconds);
+  swap(a.__isset, b.__isset);
+}
+
+multi_put_request::multi_put_request(const multi_put_request& other30) {
+  hash_key = other30.hash_key;
+  kvs = other30.kvs;
+  expire_ts_seconds = other30.expire_ts_seconds;
+  __isset = other30.__isset;
+}
+multi_put_request::multi_put_request( multi_put_request&& other31) {
+  hash_key = std::move(other31.hash_key);
+  kvs = std::move(other31.kvs);
+  expire_ts_seconds = std::move(other31.expire_ts_seconds);
+  __isset = std::move(other31.__isset);
+}
+multi_put_request& multi_put_request::operator=(const multi_put_request& other32) {
+  hash_key = other32.hash_key;
+  kvs = other32.kvs;
+  expire_ts_seconds = other32.expire_ts_seconds;
+  __isset = other32.__isset;
+  return *this;
+}
+multi_put_request& multi_put_request::operator=(multi_put_request&& other33) {
+  hash_key = std::move(other33.hash_key);
+  kvs = std::move(other33.kvs);
+  expire_ts_seconds = std::move(other33.expire_ts_seconds);
+  __isset = std::move(other33.__isset);
+  return *this;
+}
+void multi_put_request::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "multi_put_request(";
+  out << "hash_key=" << to_string(hash_key);
+  out << ", " << "kvs=" << to_string(kvs);
+  out << ", " << "expire_ts_seconds=" << to_string(expire_ts_seconds);
+  out << ")";
+}
+
+
+multi_remove_request::~multi_remove_request() throw() {
+}
+
+
+void multi_remove_request::__set_hash_key(const  ::dsn::blob& val) {
+  this->hash_key = val;
+}
+
+void multi_remove_request::__set_sort_keys(const std::vector< ::dsn::blob> & val) {
+  this->sort_keys = val;
+}
+
+void multi_remove_request::__set_max_count(const int64_t val) {
+  this->max_count = val;
+}
+
+uint32_t multi_remove_request::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->hash_key.read(iprot);
+          this->__isset.hash_key = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_LIST) {
+          {
+            this->sort_keys.clear();
+            uint32_t _size34;
+            ::apache::thrift::protocol::TType _etype37;
+            xfer += iprot->readListBegin(_etype37, _size34);
+            this->sort_keys.resize(_size34);
+            uint32_t _i38;
+            for (_i38 = 0; _i38 < _size34; ++_i38)
+            {
+              xfer += this->sort_keys[_i38].read(iprot);
+            }
+            xfer += iprot->readListEnd();
+          }
+          this->__isset.sort_keys = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 3:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->max_count);
+          this->__isset.max_count = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t multi_remove_request::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("multi_remove_request");
+
+  xfer += oprot->writeFieldBegin("hash_key", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->hash_key.write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("sort_keys", ::apache::thrift::protocol::T_LIST, 2);
+  {
+    xfer += oprot->writeListBegin(::apache::thrift::protocol::T_STRUCT, static_cast<uint32_t>(this->sort_keys.size()));
+    std::vector< ::dsn::blob> ::const_iterator _iter39;
+    for (_iter39 = this->sort_keys.begin(); _iter39 != this->sort_keys.end(); ++_iter39)
+    {
+      xfer += (*_iter39).write(oprot);
+    }
+    xfer += oprot->writeListEnd();
+  }
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("max_count", ::apache::thrift::protocol::T_I64, 3);
+  xfer += oprot->writeI64(this->max_count);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+void swap(multi_remove_request &a, multi_remove_request &b) {
+  using ::std::swap;
+  swap(a.hash_key, b.hash_key);
+  swap(a.sort_keys, b.sort_keys);
+  swap(a.max_count, b.max_count);
+  swap(a.__isset, b.__isset);
+}
+
+multi_remove_request::multi_remove_request(const multi_remove_request& other40) {
+  hash_key = other40.hash_key;
+  sort_keys = other40.sort_keys;
+  max_count = other40.max_count;
+  __isset = other40.__isset;
+}
+multi_remove_request::multi_remove_request( multi_remove_request&& other41) {
+  hash_key = std::move(other41.hash_key);
+  sort_keys = std::move(other41.sort_keys);
+  max_count = std::move(other41.max_count);
+  __isset = std::move(other41.__isset);
+}
+multi_remove_request& multi_remove_request::operator=(const multi_remove_request& other42) {
+  hash_key = other42.hash_key;
+  sort_keys = other42.sort_keys;
+  max_count = other42.max_count;
+  __isset = other42.__isset;
+  return *this;
+}
+multi_remove_request& multi_remove_request::operator=(multi_remove_request&& other43) {
+  hash_key = std::move(other43.hash_key);
+  sort_keys = std::move(other43.sort_keys);
+  max_count = std::move(other43.max_count);
+  __isset = std::move(other43.__isset);
+  return *this;
+}
+void multi_remove_request::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "multi_remove_request(";
+  out << "hash_key=" << to_string(hash_key);
+  out << ", " << "sort_keys=" << to_string(sort_keys);
+  out << ", " << "max_count=" << to_string(max_count);
+  out << ")";
+}
+
+
+multi_remove_response::~multi_remove_response() throw() {
+}
+
+
+void multi_remove_response::__set_error(const int32_t val) {
+  this->error = val;
+}
+
+void multi_remove_response::__set_count(const int64_t val) {
+  this->count = val;
+}
+
+void multi_remove_response::__set_app_id(const int32_t val) {
+  this->app_id = val;
+}
+
+void multi_remove_response::__set_partition_index(const int32_t val) {
+  this->partition_index = val;
+}
+
+void multi_remove_response::__set_decree(const int64_t val) {
+  this->decree = val;
+}
+
+void multi_remove_response::__set_server(const std::string& val) {
+  this->server = val;
+}
+
+uint32_t multi_remove_response::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_I32) {
+          xfer += iprot->readI32(this->error);
+          this->__isset.error = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->count);
+          this->__isset.count = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 3:
+        if (ftype == ::apache::thrift::protocol::T_I32) {
+          xfer += iprot->readI32(this->app_id);
+          this->__isset.app_id = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 4:
+        if (ftype == ::apache::thrift::protocol::T_I32) {
+          xfer += iprot->readI32(this->partition_index);
+          this->__isset.partition_index = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 5:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->decree);
+          this->__isset.decree = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 6:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->server);
+          this->__isset.server = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t multi_remove_response::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("multi_remove_response");
+
+  xfer += oprot->writeFieldBegin("error", ::apache::thrift::protocol::T_I32, 1);
+  xfer += oprot->writeI32(this->error);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("count", ::apache::thrift::protocol::T_I64, 2);
+  xfer += oprot->writeI64(this->count);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("app_id", ::apache::thrift::protocol::T_I32, 3);
+  xfer += oprot->writeI32(this->app_id);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("partition_index", ::apache::thrift::protocol::T_I32, 4);
+  xfer += oprot->writeI32(this->partition_index);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("decree", ::apache::thrift::protocol::T_I64, 5);
+  xfer += oprot->writeI64(this->decree);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("server", ::apache::thrift::protocol::T_STRING, 6);
+  xfer += oprot->writeString(this->server);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+void swap(multi_remove_response &a, multi_remove_response &b) {
+  using ::std::swap;
+  swap(a.error, b.error);
+  swap(a.count, b.count);
+  swap(a.app_id, b.app_id);
+  swap(a.partition_index, b.partition_index);
+  swap(a.decree, b.decree);
+  swap(a.server, b.server);
+  swap(a.__isset, b.__isset);
+}
+
+multi_remove_response::multi_remove_response(const multi_remove_response& other44) {
+  error = other44.error;
+  count = other44.count;
+  app_id = other44.app_id;
+  partition_index = other44.partition_index;
+  decree = other44.decree;
+  server = other44.server;
+  __isset = other44.__isset;
+}
+multi_remove_response::multi_remove_response( multi_remove_response&& other45) {
+  error = std::move(other45.error);
+  count = std::move(other45.count);
+  app_id = std::move(other45.app_id);
+  partition_index = std::move(other45.partition_index);
+  decree = std::move(other45.decree);
+  server = std::move(other45.server);
+  __isset = std::move(other45.__isset);
+}
+multi_remove_response& multi_remove_response::operator=(const multi_remove_response& other46) {
+  error = other46.error;
+  count = other46.count;
+  app_id = other46.app_id;
+  partition_index = other46.partition_index;
+  decree = other46.decree;
+  server = other46.server;
+  __isset = other46.__isset;
+  return *this;
+}
+multi_remove_response& multi_remove_response::operator=(multi_remove_response&& other47) {
+  error = std::move(other47.error);
+  count = std::move(other47.count);
+  app_id = std::move(other47.app_id);
+  partition_index = std::move(other47.partition_index);
+  decree = std::move(other47.decree);
+  server = std::move(other47.server);
+  __isset = std::move(other47.__isset);
+  return *this;
+}
+void multi_remove_response::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "multi_remove_response(";
+  out << "error=" << to_string(error);
+  out << ", " << "count=" << to_string(count);
+  out << ", " << "app_id=" << to_string(app_id);
+  out << ", " << "partition_index=" << to_string(partition_index);
+  out << ", " << "decree=" << to_string(decree);
+  out << ", " << "server=" << to_string(server);
+  out << ")";
+}
+
+
+multi_get_request::~multi_get_request() throw() {
+}
+
+
+void multi_get_request::__set_hash_key(const  ::dsn::blob& val) {
+  this->hash_key = val;
+}
+
+void multi_get_request::__set_sort_keys(const std::vector< ::dsn::blob> & val) {
+  this->sort_keys = val;
+}
+
+void multi_get_request::__set_max_kv_count(const int32_t val) {
+  this->max_kv_count = val;
+}
+
+void multi_get_request::__set_max_kv_size(const int32_t val) {
+  this->max_kv_size = val;
+}
+
+void multi_get_request::__set_no_value(const bool val) {
+  this->no_value = val;
+}
+
+void multi_get_request::__set_start_sortkey(const  ::dsn::blob& val) {
+  this->start_sortkey = val;
+}
+
+void multi_get_request::__set_stop_sortkey(const  ::dsn::blob& val) {
+  this->stop_sortkey = val;
+}
+
+void multi_get_request::__set_start_inclusive(const bool val) {
+  this->start_inclusive = val;
+}
+
+void multi_get_request::__set_stop_inclusive(const bool val) {
+  this->stop_inclusive = val;
+}
+
+void multi_get_request::__set_sort_key_filter_type(const filter_type::type val) {
+  this->sort_key_filter_type = val;
+}
+
+void multi_get_request::__set_sort_key_filter_pattern(const  ::dsn::blob& val) {
+  this->sort_key_filter_pattern = val;
+}
+
+void multi_get_request::__set_reverse(const bool val) {
+  this->reverse = val;
+}
+
+uint32_t multi_get_request::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->hash_key.read(iprot);
+          this->__isset.hash_key = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_LIST) {
+          {
+            this->sort_keys.clear();
+            uint32_t _size48;
+            ::apache::thrift::protocol::TType _etype51;
+            xfer += iprot->readListBegin(_etype51, _size48);
+            this->sort_keys.resize(_size48);
+            uint32_t _i52;
+            for (_i52 = 0; _i52 < _size48; ++_i52)
+            {
+              xfer += this->sort_keys[_i52].read(iprot);
+            }
+            xfer += iprot->readListEnd();
+          }
+          this->__isset.sort_keys = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 3:
+        if (ftype == ::apache::thrift::protocol::T_I32) {
+          xfer += iprot->readI32(this->max_kv_count);
+          this->__isset.max_kv_count = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 4:
+        if (ftype == ::apache::thrift::protocol::T_I32) {
+          xfer += iprot->readI32(this->max_kv_size);
+          this->__isset.max_kv_size = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 5:
+        if (ftype == ::apache::thrift::protocol::T_BOOL) {
+          xfer += iprot->readBool(this->no_value);
+          this->__isset.no_value = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 6:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->start_sortkey.read(iprot);
+          this->__isset.start_sortkey = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 7:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->stop_sortkey.read(iprot);
+          this->__isset.stop_sortkey = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 8:
+        if (ftype == ::apache::thrift::protocol::T_BOOL) {
+          xfer += iprot->readBool(this->start_inclusive);
+          this->__isset.start_inclusive = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 9:
+        if (ftype == ::apache::thrift::protocol::T_BOOL) {
+          xfer += iprot->readBool(this->stop_inclusive);
+          this->__isset.stop_inclusive = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 10:
+        if (ftype == ::apache::thrift::protocol::T_I32) {
+          int32_t ecast53;
+          xfer += iprot->readI32(ecast53);
+          this->sort_key_filter_type = (filter_type::type)ecast53;
+          this->__isset.sort_key_filter_type = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 11:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->sort_key_filter_pattern.read(iprot);
+          this->__isset.sort_key_filter_pattern = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 12:
+        if (ftype == ::apache::thrift::protocol::T_BOOL) {
+          xfer += iprot->readBool(this->reverse);
+          this->__isset.reverse = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t multi_get_request::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("multi_get_request");
+
+  xfer += oprot->writeFieldBegin("hash_key", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->hash_key.write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("sort_keys", ::apache::thrift::protocol::T_LIST, 2);
+  {
+    xfer += oprot->writeListBegin(::apache::thrift::protocol::T_STRUCT, static_cast<uint32_t>(this->sort_keys.size()));
+    std::vector< ::dsn::blob> ::const_iterator _iter54;
+    for (_iter54 = this->sort_keys.begin(); _iter54 != this->sort_keys.end(); ++_iter54)
+    {
+      xfer += (*_iter54).write(oprot);
+    }
+    xfer += oprot->writeListEnd();
+  }
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("max_kv_count", ::apache::thrift::protocol::T_I32, 3);
+  xfer += oprot->writeI32(this->max_kv_count);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("max_kv_size", ::apache::thrift::protocol::T_I32, 4);
+  xfer += oprot->writeI32(this->max_kv_size);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("no_value", ::apache::thrift::protocol::T_BOOL, 5);
+  xfer += oprot->writeBool(this->no_value);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("start_sortkey", ::apache::thrift::protocol::T_STRUCT, 6);
+  xfer += this->start_sortkey.write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("stop_sortkey", ::apache::thrift::protocol::T_STRUCT, 7);
+  xfer += this->stop_sortkey.write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("start_inclusive", ::apache::thrift::protocol::T_BOOL, 8);
+  xfer += oprot->writeBool(this->start_inclusive);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("stop_inclusive", ::apache::thrift::protocol::T_BOOL, 9);
+  xfer += oprot->writeBool(this->stop_inclusive);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("sort_key_filter_type", ::apache::thrift::protocol::T_I32, 10);
+  xfer += oprot->writeI32((int32_t)this->sort_key_filter_type);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("sort_key_filter_pattern", ::apache::thrift::protocol::T_STRUCT, 11);
+  xfer += this->sort_key_filter_pattern.write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("reverse", ::apache::thrift::protocol::T_BOOL, 12);
+  xfer += oprot->writeBool(this->reverse);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+void swap(multi_get_request &a, multi_get_request &b) {
+  using ::std::swap;
+  swap(a.hash_key, b.hash_key);
+  swap(a.sort_keys, b.sort_keys);
+  swap(a.max_kv_count, b.max_kv_count);
+  swap(a.max_kv_size, b.max_kv_size);
+  swap(a.no_value, b.no_value);
+  swap(a.start_sortkey, b.start_sortkey);
+  swap(a.stop_sortkey, b.stop_sortkey);
+  swap(a.start_inclusive, b.start_inclusive);
+  swap(a.stop_inclusive, b.stop_inclusive);
+  swap(a.sort_key_filter_type, b.sort_key_filter_type);
+  swap(a.sort_key_filter_pattern, b.sort_key_filter_pattern);
+  swap(a.reverse, b.reverse);
+  swap(a.__isset, b.__isset);
+}
+
+multi_get_request::multi_get_request(const multi_get_request& other55) {
+  hash_key = other55.hash_key;
+  sort_keys = other55.sort_keys;
+  max_kv_count = other55.max_kv_count;
+  max_kv_size = other55.max_kv_size;
+  no_value = other55.no_value;
+  start_sortkey = other55.start_sortkey;
+  stop_sortkey = other55.stop_sortkey;
+  start_inclusive = other55.start_inclusive;
+  stop_inclusive = other55.stop_inclusive;
+  sort_key_filter_type = other55.sort_key_filter_type;
+  sort_key_filter_pattern = other55.sort_key_filter_pattern;
+  reverse = other55.reverse;
+  __isset = other55.__isset;
+}
+multi_get_request::multi_get_request( multi_get_request&& other56) {
+  hash_key = std::move(other56.hash_key);
+  sort_keys = std::move(other56.sort_keys);
+  max_kv_count = std::move(other56.max_kv_count);
+  max_kv_size = std::move(other56.max_kv_size);
+  no_value = std::move(other56.no_value);
+  start_sortkey = std::move(other56.start_sortkey);
+  stop_sortkey = std::move(other56.stop_sortkey);
+  start_inclusive = std::move(other56.start_inclusive);
+  stop_inclusive = std::move(other56.stop_inclusive);
+  sort_key_filter_type = std::move(other56.sort_key_filter_type);
+  sort_key_filter_pattern = std::move(other56.sort_key_filter_pattern);
+  reverse = std::move(other56.reverse);
+  __isset = std::move(other56.__isset);
+}
+multi_get_request& multi_get_request::operator=(const multi_get_request& other57) {
+  hash_key = other57.hash_key;
+  sort_keys = other57.sort_keys;
+  max_kv_count = other57.max_kv_count;
+  max_kv_size = other57.max_kv_size;
+  no_value = other57.no_value;
+  start_sortkey = other57.start_sortkey;
+  stop_sortkey = other57.stop_sortkey;
+  start_inclusive = other57.start_inclusive;
+  stop_inclusive = other57.stop_inclusive;
+  sort_key_filter_type = other57.sort_key_filter_type;
+  sort_key_filter_pattern = other57.sort_key_filter_pattern;
+  reverse = other57.reverse;
+  __isset = other57.__isset;
+  return *this;
+}
+multi_get_request& multi_get_request::operator=(multi_get_request&& other58) {
+  hash_key = std::move(other58.hash_key);
+  sort_keys = std::move(other58.sort_keys);
+  max_kv_count = std::move(other58.max_kv_count);
+  max_kv_size = std::move(other58.max_kv_size);
+  no_value = std::move(other58.no_value);
+  start_sortkey = std::move(other58.start_sortkey);
+  stop_sortkey = std::move(other58.stop_sortkey);
+  start_inclusive = std::move(other58.start_inclusive);
+  stop_inclusive = std::move(other58.stop_inclusive);
+  sort_key_filter_type = std::move(other58.sort_key_filter_type);
+  sort_key_filter_pattern = std::move(other58.sort_key_filter_pattern);
+  reverse = std::move(other58.reverse);
+  __isset = std::move(other58.__isset);
+  return *this;
+}
+void multi_get_request::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "multi_get_request(";
+  out << "hash_key=" << to_string(hash_key);
+  out << ", " << "sort_keys=" << to_string(sort_keys);
+  out << ", " << "max_kv_count=" << to_string(max_kv_count);
+  out << ", " << "max_kv_size=" << to_string(max_kv_size);
+  out << ", " << "no_value=" << to_string(no_value);
+  out << ", " << "start_sortkey=" << to_string(start_sortkey);
+  out << ", " << "stop_sortkey=" << to_string(stop_sortkey);
+  out << ", " << "start_inclusive=" << to_string(start_inclusive);
+  out << ", " << "stop_inclusive=" << to_string(stop_inclusive);
+  out << ", " << "sort_key_filter_type=" << to_string(sort_key_filter_type);
+  out << ", " << "sort_key_filter_pattern=" << to_string(sort_key_filter_pattern);
+  out << ", " << "reverse=" << to_string(reverse);
+  out << ")";
+}
+
+
+multi_get_response::~multi_get_response() throw() {
+}
+
+
+void multi_get_response::__set_error(const int32_t val) {
+  this->error = val;
+}
+
+void multi_get_response::__set_kvs(const std::vector<key_value> & val) {
+  this->kvs = val;
+}
+
+void multi_get_response::__set_app_id(const int32_t val) {
+  this->app_id = val;
+}
+
+void multi_get_response::__set_partition_index(const int32_t val) {
+  this->partition_index = val;
+}
+
+void multi_get_response::__set_server(const std::string& val) {
+  this->server = val;
+}
+
+uint32_t multi_get_response::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_I32) {
+          xfer += iprot->readI32(this->error);
+          this->__isset.error = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_LIST) {
+          {
+            this->kvs.clear();
+            uint32_t _size59;
+            ::apache::thrift::protocol::TType _etype62;
+            xfer += iprot->readListBegin(_etype62, _size59);
+            this->kvs.resize(_size59);
+            uint32_t _i63;
+            for (_i63 = 0; _i63 < _size59; ++_i63)
+            {
+              xfer += this->kvs[_i63].read(iprot);
+            }
+            xfer += iprot->readListEnd();
+          }
+          this->__isset.kvs = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 3:
+        if (ftype == ::apache::thrift::protocol::T_I32) {
+          xfer += iprot->readI32(this->app_id);
+          this->__isset.app_id = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 4:
+        if (ftype == ::apache::thrift::protocol::T_I32) {
+          xfer += iprot->readI32(this->partition_index);
+          this->__isset.partition_index = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 6:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->server);
+          this->__isset.server = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t multi_get_response::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("multi_get_response");
+
+  xfer += oprot->writeFieldBegin("error", ::apache::thrift::protocol::T_I32, 1);
+  xfer += oprot->writeI32(this->error);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("kvs", ::apache::thrift::protocol::T_LIST, 2);
+  {
+    xfer += oprot->writeListBegin(::apache::thrift::protocol::T_STRUCT, static_cast<uint32_t>(this->kvs.size()));
+    std::vector<key_value> ::const_iterator _iter64;
+    for (_iter64 = this->kvs.begin(); _iter64 != this->kvs.end(); ++_iter64)
+    {
+      xfer += (*_iter64).write(oprot);
+    }
+    xfer += oprot->writeListEnd();
+  }
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("app_id", ::apache::thrift::protocol::T_I32, 3);
+  xfer += oprot->writeI32(this->app_id);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("partition_index", ::apache::thrift::protocol::T_I32, 4);
+  xfer += oprot->writeI32(this->partition_index);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("server", ::apache::thrift::protocol::T_STRING, 6);
+  xfer += oprot->writeString(this->server);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+void swap(multi_get_response &a, multi_get_response &b) {
+  using ::std::swap;
+  swap(a.error, b.error);
+  swap(a.kvs, b.kvs);
+  swap(a.app_id, b.app_id);
+  swap(a.partition_index, b.partition_index);
+  swap(a.server, b.server);
+  swap(a.__isset, b.__isset);
+}
+
+multi_get_response::multi_get_response(const multi_get_response& other65) {
+  error = other65.error;
+  kvs = other65.kvs;
+  app_id = other65.app_id;
+  partition_index = other65.partition_index;
+  server = other65.server;
+  __isset = other65.__isset;
+}
+multi_get_response::multi_get_response( multi_get_response&& other66) {
+  error = std::move(other66.error);
+  kvs = std::move(other66.kvs);
+  app_id = std::move(other66.app_id);
+  partition_index = std::move(other66.partition_index);
+  server = std::move(other66.server);
+  __isset = std::move(other66.__isset);
+}
+multi_get_response& multi_get_response::operator=(const multi_get_response& other67) {
+  error = other67.error;
+  kvs = other67.kvs;
+  app_id = other67.app_id;
+  partition_index = other67.partition_index;
+  server = other67.server;
+  __isset = other67.__isset;
+  return *this;
+}
+multi_get_response& multi_get_response::operator=(multi_get_response&& other68) {
+  error = std::move(other68.error);
+  kvs = std::move(other68.kvs);
+  app_id = std::move(other68.app_id);
+  partition_index = std::move(other68.partition_index);
+  server = std::move(other68.server);
+  __isset = std::move(other68.__isset);
+  return *this;
+}
+void multi_get_response::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "multi_get_response(";
+  out << "error=" << to_string(error);
+  out << ", " << "kvs=" << to_string(kvs);
+  out << ", " << "app_id=" << to_string(app_id);
+  out << ", " << "partition_index=" << to_string(partition_index);
+  out << ", " << "server=" << to_string(server);
+  out << ")";
+}
+
+
+incr_request::~incr_request() throw() {
+}
+
+
+void incr_request::__set_key(const  ::dsn::blob& val) {
+  this->key = val;
+}
+
+void incr_request::__set_increment(const int64_t val) {
+  this->increment = val;
+}
+
+uint32_t incr_request::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->key.read(iprot);
+          this->__isset.key = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->increment);
+          this->__isset.increment = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t incr_request::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("incr_request");
+
+  xfer += oprot->writeFieldBegin("key", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->key.write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("increment", ::apache::thrift::protocol::T_I64, 2);
+  xfer += oprot->writeI64(this->increment);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+void swap(incr_request &a, incr_request &b) {
+  using ::std::swap;
+  swap(a.key, b.key);
+  swap(a.increment, b.increment);
+  swap(a.__isset, b.__isset);
+}
+
+incr_request::incr_request(const incr_request& other69) {
+  key = other69.key;
+  increment = other69.increment;
+  __isset = other69.__isset;
+}
+incr_request::incr_request( incr_request&& other70) {
+  key = std::move(other70.key);
+  increment = std::move(other70.increment);
+  __isset = std::move(other70.__isset);
+}
+incr_request& incr_request::operator=(const incr_request& other71) {
+  key = other71.key;
+  increment = other71.increment;
+  __isset = other71.__isset;
+  return *this;
+}
+incr_request& incr_request::operator=(incr_request&& other72) {
+  key = std::move(other72.key);
+  increment = std::move(other72.increment);
+  __isset = std::move(other72.__isset);
+  return *this;
+}
+void incr_request::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "incr_request(";
+  out << "key=" << to_string(key);
+  out << ", " << "increment=" << to_string(increment);
+  out << ")";
+}
+
+
+get_scanner_request::~get_scanner_request() throw() {
+}
+
+
+void get_scanner_request::__set_start_key(const  ::dsn::blob& val) {
+  this->start_key = val;
+}
+
+void get_scanner_request::__set_stop_key(const  ::dsn::blob& val) {
+  this->stop_key = val;
+}
+
+void get_scanner_request::__set_start_inclusive(const bool val) {
+  this->start_inclusive = val;
+}
+
+void get_scanner_request::__set_stop_inclusive(const bool val) {
+  this->stop_inclusive = val;
+}
+
+void get_scanner_request::__set_batch_size(const int32_t val) {
+  this->batch_size = val;
+}
+
+void get_scanner_request::__set_no_value(const bool val) {
+  this->no_value = val;
+}
+
+void get_scanner_request::__set_hash_key_filter_type(const filter_type::type val) {
+  this->hash_key_filter_type = val;
+}
+
+void get_scanner_request::__set_hash_key_filter_pattern(const  ::dsn::blob& val) {
+  this->hash_key_filter_pattern = val;
+}
+
+void get_scanner_request::__set_sort_key_filter_type(const filter_type::type val) {
+  this->sort_key_filter_type = val;
+}
+
+void get_scanner_request::__set_sort_key_filter_pattern(const  ::dsn::blob& val) {
+  this->sort_key_filter_pattern = val;
+}
+
+void get_scanner_request::__set_need_check_hash(const bool val) {
+  this->need_check_hash = val;
+}
+
+uint32_t get_scanner_request::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->start_key.read(iprot);
+          this->__isset.start_key = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->stop_key.read(iprot);
+          this->__isset.stop_key = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 3:
+        if (ftype == ::apache::thrift::protocol::T_BOOL) {
+          xfer += iprot->readBool(this->start_inclusive);
+          this->__isset.start_inclusive = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 4:
+        if (ftype == ::apache::thrift::protocol::T_BOOL) {
+          xfer += iprot->readBool(this->stop_inclusive);
+          this->__isset.stop_inclusive = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 5:
+        if (ftype == ::apache::thrift::protocol::T_I32) {
+          xfer += iprot->readI32(this->batch_size);
+          this->__isset.batch_size = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 6:
+        if (ftype == ::apache::thrift::protocol::T_BOOL) {
+          xfer += iprot->readBool(this->no_value);
+          this->__isset.no_value = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 7:
+        if (ftype == ::apache::thrift::protocol::T_I32) {
+          int32_t ecast73;
+          xfer += iprot->readI32(ecast73);
+          this->hash_key_filter_type = (filter_type::type)ecast73;
+          this->__isset.hash_key_filter_type = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 8:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->hash_key_filter_pattern.read(iprot);
+          this->__isset.hash_key_filter_pattern = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 9:
+        if (ftype == ::apache::thrift::protocol::T_I32) {
+          int32_t ecast74;
+          xfer += iprot->readI32(ecast74);
+          this->sort_key_filter_type = (filter_type::type)ecast74;
+          this->__isset.sort_key_filter_type = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 10:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->sort_key_filter_pattern.read(iprot);
+          this->__isset.sort_key_filter_pattern = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 11:
+        if (ftype == ::apache::thrift::protocol::T_BOOL) {
+          xfer += iprot->readBool(this->need_check_hash);
+          this->__isset.need_check_hash = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t get_scanner_request::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("get_scanner_request");
+
+  xfer += oprot->writeFieldBegin("start_key", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->start_key.write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("stop_key", ::apache::thrift::protocol::T_STRUCT, 2);
+  xfer += this->stop_key.write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("start_inclusive", ::apache::thrift::protocol::T_BOOL, 3);
+  xfer += oprot->writeBool(this->start_inclusive);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("stop_inclusive", ::apache::thrift::protocol::T_BOOL, 4);
+  xfer += oprot->writeBool(this->stop_inclusive);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("batch_size", ::apache::thrift::protocol::T_I32, 5);
+  xfer += oprot->writeI32(this->batch_size);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("no_value", ::apache::thrift::protocol::T_BOOL, 6);
+  xfer += oprot->writeBool(this->no_value);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("hash_key_filter_type", ::apache::thrift::protocol::T_I32, 7);
+  xfer += oprot->writeI32((int32_t)this->hash_key_filter_type);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("hash_key_filter_pattern", ::apache::thrift::protocol::T_STRUCT, 8);
+  xfer += this->hash_key_filter_pattern.write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("sort_key_filter_type", ::apache::thrift::protocol::T_I32, 9);
+  xfer += oprot->writeI32((int32_t)this->sort_key_filter_type);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("sort_key_filter_pattern", ::apache::thrift::protocol::T_STRUCT, 10);
+  xfer += this->sort_key_filter_pattern.write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("need_check_hash", ::apache::thrift::protocol::T_BOOL, 11);
+  xfer += oprot->writeBool(this->need_check_hash);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+void swap(get_scanner_request &a, get_scanner_request &b) {
+  using ::std::swap;
+  swap(a.start_key, b.start_key);
+  swap(a.stop_key, b.stop_key);
+  swap(a.start_inclusive, b.start_inclusive);
+  swap(a.stop_inclusive, b.stop_inclusive);
+  swap(a.batch_size, b.batch_size);
+  swap(a.no_value, b.no_value);
+  swap(a.hash_key_filter_type, b.hash_key_filter_type);
+  swap(a.hash_key_filter_pattern, b.hash_key_filter_pattern);
+  swap(a.sort_key_filter_type, b.sort_key_filter_type);
+  swap(a.sort_key_filter_pattern, b.sort_key_filter_pattern);
+  swap(a.need_check_hash, b.need_check_hash);
+  swap(a.__isset, b.__isset);
+}
+
+get_scanner_request::get_scanner_request(const get_scanner_request& other75) {
+  start_key = other75.start_key;
+  stop_key = other75.stop_key;
+  start_inclusive = other75.start_inclusive;
+  stop_inclusive = other75.stop_inclusive;
+  batch_size = other75.batch_size;
+  no_value = other75.no_value;
+  hash_key_filter_type = other75.hash_key_filter_type;
+  hash_key_filter_pattern = other75.hash_key_filter_pattern;
+  sort_key_filter_type = other75.sort_key_filter_type;
+  sort_key_filter_pattern = other75.sort_key_filter_pattern;
+  need_check_hash = other75.need_check_hash;
+  __isset = other75.__isset;
+}
+get_scanner_request::get_scanner_request( get_scanner_request&& other76) {
+  start_key = std::move(other76.start_key);
+  stop_key = std::move(other76.stop_key);
+  start_inclusive = std::move(other76.start_inclusive);
+  stop_inclusive = std::move(other76.stop_inclusive);
+  batch_size = std::move(other76.batch_size);
+  no_value = std::move(other76.no_value);
+  hash_key_filter_type = std::move(other76.hash_key_filter_type);
+  hash_key_filter_pattern = std::move(other76.hash_key_filter_pattern);
+  sort_key_filter_type = std::move(other76.sort_key_filter_type);
+  sort_key_filter_pattern = std::move(other76.sort_key_filter_pattern);
+  need_check_hash = std::move(other76.need_check_hash);
+  __isset = std::move(other76.__isset);
+}
+get_scanner_request& get_scanner_request::operator=(const get_scanner_request& other77) {
+  start_key = other77.start_key;
+  stop_key = other77.stop_key;
+  start_inclusive = other77.start_inclusive;
+  stop_inclusive = other77.stop_inclusive;
+  batch_size = other77.batch_size;
+  no_value = other77.no_value;
+  hash_key_filter_type = other77.hash_key_filter_type;
+  hash_key_filter_pattern = other77.hash_key_filter_pattern;
+  sort_key_filter_type = other77.sort_key_filter_type;
+  sort_key_filter_pattern = other77.sort_key_filter_pattern;
+  need_check_hash = other77.need_check_hash;
+  __isset = other77.__isset;
+  return *this;
+}
+get_scanner_request& get_scanner_request::operator=(get_scanner_request&& other78) {
+  start_key = std::move(other78.start_key);
+  stop_key = std::move(other78.stop_key);
+  start_inclusive = std::move(other78.start_inclusive);
+  stop_inclusive = std::move(other78.stop_inclusive);
+  batch_size = std::move(other78.batch_size);
+  no_value = std::move(other78.no_value);
+  hash_key_filter_type = std::move(other78.hash_key_filter_type);
+  hash_key_filter_pattern = std::move(other78.hash_key_filter_pattern);
+  sort_key_filter_type = std::move(other78.sort_key_filter_type);
+  sort_key_filter_pattern = std::move(other78.sort_key_filter_pattern);
+  need_check_hash = std::move(other78.need_check_hash);
+  __isset = std::move(other78.__isset);
+  return *this;
+}
+void get_scanner_request::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "get_scanner_request(";
+  out << "start_key=" << to_string(start_key);
+  out << ", " << "stop_key=" << to_string(stop_key);
+  out << ", " << "start_inclusive=" << to_string(start_inclusive);
+  out << ", " << "stop_inclusive=" << to_string(stop_inclusive);
+  out << ", " << "batch_size=" << to_string(batch_size);
+  out << ", " << "no_value=" << to_string(no_value);
+  out << ", " << "hash_key_filter_type=" << to_string(hash_key_filter_type);
+  out << ", " << "hash_key_filter_pattern=" << to_string(hash_key_filter_pattern);
+  out << ", " << "sort_key_filter_type=" << to_string(sort_key_filter_type);
+  out << ", " << "sort_key_filter_pattern=" << to_string(sort_key_filter_pattern);
+  out << ", " << "need_check_hash=" << to_string(need_check_hash);
+  out << ")";
+}
+
+
+scan_request::~scan_request() throw() {
+}
+
+
+void scan_request::__set_context_id(const int64_t val) {
+  this->context_id = val;
+}
+
+uint32_t scan_request::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->context_id);
+          this->__isset.context_id = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t scan_request::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("scan_request");
+
+  xfer += oprot->writeFieldBegin("context_id", ::apache::thrift::protocol::T_I64, 1);
+  xfer += oprot->writeI64(this->context_id);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+void swap(scan_request &a, scan_request &b) {
+  using ::std::swap;
+  swap(a.context_id, b.context_id);
+  swap(a.__isset, b.__isset);
+}
+
+scan_request::scan_request(const scan_request& other79) {
+  context_id = other79.context_id;
+  __isset = other79.__isset;
+}
+scan_request::scan_request( scan_request&& other80) {
+  context_id = std::move(other80.context_id);
+  __isset = std::move(other80.__isset);
+}
+scan_request& scan_request::operator=(const scan_request& other81) {
+  context_id = other81.context_id;
+  __isset = other81.__isset;
+  return *this;
+}
+scan_request& scan_request::operator=(scan_request&& other82) {
+  context_id = std::move(other82.context_id);
+  __isset = std::move(other82.__isset);
+  return *this;
+}
+void scan_request::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "scan_request(";
+  out << "context_id=" << to_string(context_id);
+  out << ")";
+}
+
+
+scan_response::~scan_response() throw() {
+}
+
+
+void scan_response::__set_error(const int32_t val) {
+  this->error = val;
+}
+
+void scan_response::__set_kvs(const std::vector<key_value> & val) {
+  this->kvs = val;
+}
+
+void scan_response::__set_context_id(const int64_t val) {
+  this->context_id = val;
+}
+
+void scan_response::__set_app_id(const int32_t val) {
+  this->app_id = val;
+}
+
+void scan_response::__set_partition_index(const int32_t val) {
+  this->partition_index = val;
+}
+
+void scan_response::__set_server(const std::string& val) {
+  this->server = val;
+}
+
+uint32_t scan_response::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_I32) {
+          xfer += iprot->readI32(this->error);
+          this->__isset.error = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_LIST) {
+          {
+            this->kvs.clear();
+            uint32_t _size83;
+            ::apache::thrift::protocol::TType _etype86;
+            xfer += iprot->readListBegin(_etype86, _size83);
+            this->kvs.resize(_size83);
+            uint32_t _i87;
+            for (_i87 = 0; _i87 < _size83; ++_i87)
+            {
+              xfer += this->kvs[_i87].read(iprot);
+            }
+            xfer += iprot->readListEnd();
+          }
+          this->__isset.kvs = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 3:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->context_id);
+          this->__isset.context_id = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 4:
+        if (ftype == ::apache::thrift::protocol::T_I32) {
+          xfer += iprot->readI32(this->app_id);
+          this->__isset.app_id = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 5:
+        if (ftype == ::apache::thrift::protocol::T_I32) {
+          xfer += iprot->readI32(this->partition_index);
+          this->__isset.partition_index = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 6:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->server);
+          this->__isset.server = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t scan_response::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("scan_response");
+
+  xfer += oprot->writeFieldBegin("error", ::apache::thrift::protocol::T_I32, 1);
+  xfer += oprot->writeI32(this->error);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("kvs", ::apache::thrift::protocol::T_LIST, 2);
+  {
+    xfer += oprot->writeListBegin(::apache::thrift::protocol::T_STRUCT, static_cast<uint32_t>(this->kvs.size()));
+    std::vector<key_value> ::const_iterator _iter88;
+    for (_iter88 = this->kvs.begin(); _iter88 != this->kvs.end(); ++_iter88)
+    {
+      xfer += (*_iter88).write(oprot);
+    }
+    xfer += oprot->writeListEnd();
+  }
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("context_id", ::apache::thrift::protocol::T_I64, 3);
+  xfer += oprot->writeI64(this->context_id);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("app_id", ::apache::thrift::protocol::T_I32, 4);
+  xfer += oprot->writeI32(this->app_id);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("partition_index", ::apache::thrift::protocol::T_I32, 5);
+  xfer += oprot->writeI32(this->partition_index);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("server", ::apache::thrift::protocol::T_STRING, 6);
+  xfer += oprot->writeString(this->server);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+void swap(scan_response &a, scan_response &b) {
+  using ::std::swap;
+  swap(a.error, b.error);
+  swap(a.kvs, b.kvs);
+  swap(a.context_id, b.context_id);
+  swap(a.app_id, b.app_id);
+  swap(a.partition_index, b.partition_index);
+  swap(a.server, b.server);
+  swap(a.__isset, b.__isset);
+}
+
+scan_response::scan_response(const scan_response& other89) {
+  error = other89.error;
+  kvs = other89.kvs;
+  context_id = other89.context_id;
+  app_id = other89.app_id;
+  partition_index = other89.partition_index;
+  server = other89.server;
+  __isset = other89.__isset;
+}
+scan_response::scan_response( scan_response&& other90) {
+  error = std::move(other90.error);
+  kvs = std::move(other90.kvs);
+  context_id = std::move(other90.context_id);
+  app_id = std::move(other90.app_id);
+  partition_index = std::move(other90.partition_index);
+  server = std::move(other90.server);
+  __isset = std::move(other90.__isset);
+}
+scan_response& scan_response::operator=(const scan_response& other91) {
+  error = other91.error;
+  kvs = other91.kvs;
+  context_id = other91.context_id;
+  app_id = other91.app_id;
+  partition_index = other91.partition_index;
+  server = other91.server;
+  __isset = other91.__isset;
+  return *this;
+}
+scan_response& scan_response::operator=(scan_response&& other92) {
+  error = std::move(other92.error);
+  kvs = std::move(other92.kvs);
+  context_id = std::move(other92.context_id);
+  app_id = std::move(other92.app_id);
+  partition_index = std::move(other92.partition_index);
+  server = std::move(other92.server);
+  __isset = std::move(other92.__isset);
+  return *this;
+}
+void scan_response::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "scan_response(";
+  out << "error=" << to_string(error);
+  out << ", " << "kvs=" << to_string(kvs);
+  out << ", " << "context_id=" << to_string(context_id);
+  out << ", " << "app_id=" << to_string(app_id);
+  out << ", " << "partition_index=" << to_string(partition_index);
+  out << ", " << "server=" << to_string(server);
+  out << ")";
+}
+
+}} // namespace

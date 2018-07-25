@@ -126,6 +126,7 @@ struct get_scanner_request
     8:dsn.blob     hash_key_filter_pattern;
     9:filter_type  sort_key_filter_type;
     10:dsn.blob    sort_key_filter_pattern;
+    11:bool     need_check_hash;
 }
 
 struct scan_request
