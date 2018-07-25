@@ -168,6 +168,7 @@ private:
     // return 1 if value is appended
     // return 2 if value is expired
     // return 3 if value is filtered
+    // return 4 if key is not pass hash check
     int append_key_value_for_scan(std::vector<::dsn::apps::key_value> &kvs,
                                   const rocksdb::Slice &key,
                                   const rocksdb::Slice &value,
@@ -176,7 +177,8 @@ private:
                                   ::dsn::apps::filter_type::type sort_key_filter_type,
                                   const ::dsn::blob &sort_key_filter_pattern,
                                   uint32_t epoch_now,
-                                  bool no_value);
+                                  bool no_value,
+                                  bool need_check_hash);
 
     // return 1 if value is appended
     // return 2 if value is expired
@@ -235,6 +237,12 @@ private:
         return pegasus::check_if_record_expired(
             _value_schema_version, epoch_now, utils::to_string_view(raw_value));
     }
+
+    // return rocksdb::Status::OK() if partition should serve key
+    // otherwise return rocksdb::Status::NotFound()
+    // used when full scan
+    template <class T>
+    rocksdb::Status check_key_hash_match(const T &key);
 
 private:
     dsn::gpid _gpid;

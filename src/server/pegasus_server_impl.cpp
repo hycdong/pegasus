@@ -1178,7 +1178,8 @@ void pegasus_server_impl::on_get_scanner(const ::dsn::apps::get_scanner_request 
                                           request.sort_key_filter_type,
                                           request.sort_key_filter_pattern,
                                           epoch_now,
-                                          request.no_value);
+                                          request.no_value,
+                                          request.need_check_hash);
         if (r == 1) {
             count++;
         } else if (r == 2) {
@@ -1232,7 +1233,8 @@ void pegasus_server_impl::on_get_scanner(const ::dsn::apps::get_scanner_request 
                                      std::string(request.sort_key_filter_pattern.data(),
                                                  request.sort_key_filter_pattern.length()),
                                      request.batch_size,
-                                     request.no_value));
+                                     request.no_value,
+                                     request.need_check_hash));
         int64_t handle = _context_cache.put(std::move(context));
         resp.context_id = handle;
         // if the context is used, it will be fetched and re-put into cache,
@@ -1282,6 +1284,7 @@ void pegasus_server_impl::on_scan(const ::dsn::apps::scan_request &request,
         ::dsn::apps::filter_type::type sort_key_filter_type = context->hash_key_filter_type;
         const ::dsn::blob &sort_key_filter_pattern = context->hash_key_filter_pattern;
         bool no_value = context->no_value;
+        bool need_check_hash = context->need_check_hash;
         bool complete = false;
         uint32_t epoch_now = ::pegasus::utils::epoch_now();
         uint64_t expire_count = 0;
@@ -1304,7 +1307,8 @@ void pegasus_server_impl::on_scan(const ::dsn::apps::scan_request &request,
                                               sort_key_filter_type,
                                               sort_key_filter_pattern,
                                               epoch_now,
-                                              no_value);
+                                              no_value,
+                                              need_check_hash);
             if (r == 1) {
                 count++;
             } else if (r == 2) {
@@ -2082,13 +2086,21 @@ int pegasus_server_impl::append_key_value_for_scan(
     ::dsn::apps::filter_type::type sort_key_filter_type,
     const ::dsn::blob &sort_key_filter_pattern,
     uint32_t epoch_now,
-    bool no_value)
+    bool no_value,
+    bool need_check_hash)
 {
     if (check_if_record_expired(epoch_now, value)) {
         if (_verbose_log) {
             derror("%s: rocksdb data expired for scan", replica_name());
         }
         return 2;
+    }
+
+    if (need_check_hash && !check_key_hash_match(key).ok()) {
+        if (_verbose_log) {
+            derror("%s: not serve hash key while scan", replica_name());
+        }
+        return 4;
     }
 
     ::dsn::apps::key_value kv;
@@ -2455,6 +2467,21 @@ void pegasus_server_impl::set_partition_version(uint32_t partition_version)
 
     _partition_version.store(partition_version);
     _key_ttl_compaction_filter.SetPartitionVersion(partition_version);
+}
+
+template <class T>
+rocksdb::Status pegasus_server_impl::check_key_hash_match(const T &key)
+{
+    if (_gpid.get_partition_index() > _partition_version) {
+        return rocksdb::Status::NotFound();
+    }
+
+    uint32_t hash = (uint32_t)pegasus_key_hash(key);
+    if ((hash & _partition_version) != _gpid.get_partition_index()) {
+        return rocksdb::Status::NotFound();
+    }
+
+    return rocksdb::Status::OK();
 }
 
 } // namespace server
