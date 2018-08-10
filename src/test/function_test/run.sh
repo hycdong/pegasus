@@ -27,3 +27,5 @@ GTEST_OUTPUT="xml:$REPORT_DIR/restore.xml" GTEST_FILTER="restore_test.*" ./$test
 exit_if_fail $? "run test restore_test failed: $test_case $config_file $table_name"
 GTEST_OUTPUT="xml:$REPORT_DIR/recovery.xml" GTEST_FILTER="recovery_test.*" ./$test_case $config_file $table_name
 exit_if_fail $? "run test recovery failed: $test_case $config_file $table_name"
+GTEST_OUTPUT="xml:$REPORT_DIR/split.xml" GTEST_FILTER="split.*" ./$test_case $config_file $table_name
+exit_if_fail $? "run test split failed: $test_case $config_file $table_name"
