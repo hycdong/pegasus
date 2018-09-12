@@ -140,7 +140,7 @@ public:
     storage_apply_checkpoint(chkpt_apply_mode mode,
                              const dsn::replication::learn_state &state) override;
 
-    //
+    // TODO(hyc): comments
     virtual void set_partition_version(uint32_t partition_version) override;
 
     virtual int64_t last_durable_decree() const override { return _last_durable_decree.load(); }

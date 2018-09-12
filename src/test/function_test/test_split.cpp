@@ -75,25 +75,44 @@ TEST(split, basic_split)
 
         if(!completed){
             int ret;
-            std::string hash = "hash_" + boost::lexical_cast<std::string>(counter);
-            std::string sort = "sort_" + boost::lexical_cast<std::string>(counter);
+            std::string hash = "keyh_" + boost::lexical_cast<std::string>(counter);
+            std::string sort = "keys_" + boost::lexical_cast<std::string>(counter);
 
             ret = pg_client->set(hash, sort, "value");
             if (ret == 0) {
                 expected[hash][sort] = "value";
+                std::cerr << "set " << counter << " succeed" << std::endl;
                 counter++;
-                std::cerr << "set " << counter-1 << " succeed" << std::endl;
             } else {
-                std::cerr << "set " << counter-1 << " failed, error is " << pg_client->get_error_string(ret) << std::endl;
+                std::cerr << "set " << counter << " failed, error is " << pg_client->get_error_string(ret) << std::endl;
             }
             // ok or timeout
             ASSERT_TRUE((ret == 0 || ret == -2));
 
             //TODO(hyc): change to 5 seconds will lead to error, check partition_version=-1
             std::cerr << "split is not finished, wait for 5 seconds" << std::endl;
-            std::this_thread::sleep_for(std::chrono::seconds(10));
+            std::this_thread::sleep_for(std::chrono::seconds(5));
         }else{
             std::cerr << "partition split finished" << std::endl;
         }
+    }
+
+    // validate data after partition split
+    for (i = 0; i < count; ++i) {
+        std::string hash_key = "hashkey" + boost::lexical_cast<std::string>(i);
+        std::string sort_key = "sortkey" + boost::lexical_cast<std::string>(i);
+        std::string value;
+        auto ret = pg_client->get(hash_key, sort_key, value);
+        ASSERT_EQ(ret, 0);
+        ASSERT_EQ(expected[hash_key][sort_key], value);
+    }
+
+    for (i = 0; i < counter; ++i) {
+        std::string hash_key = "keyh_" + boost::lexical_cast<std::string>(i);
+        std::string sort_key = "keys_" + boost::lexical_cast<std::string>(i);
+        std::string value;
+        auto ret = pg_client->get(hash_key, sort_key, value);
+        ASSERT_EQ(ret, 0);
+        ASSERT_EQ(expected[hash_key][sort_key], value);
     }
 }
