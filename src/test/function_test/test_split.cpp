@@ -89,9 +89,8 @@ TEST(split, basic_split)
             // ok or timeout
             ASSERT_TRUE((ret == 0 || ret == -2));
 
-            //TODO(hyc): change to 5 seconds will lead to error, check partition_version=-1
-            std::cerr << "split is not finished, wait for 5 seconds" << std::endl;
-            std::this_thread::sleep_for(std::chrono::seconds(5));
+            std::cerr << "split is not finished, wait for 1 seconds" << std::endl;
+            std::this_thread::sleep_for(std::chrono::seconds(1));
         }else{
             std::cerr << "partition split finished" << std::endl;
         }
