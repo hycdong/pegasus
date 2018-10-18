@@ -37,13 +37,19 @@ public:
                 _value_schema_version, utils::epoch_now(), utils::to_string_view(existing_value))) {
             return true;
         }
+
         // _partition_version < 0 indicate current partition not in service
         // if current partition not served this key, return true immediately
         if (_partition_version > 0 && _partition_id <= _partition_version) {
-            // TODO(hyc): full scan key is not neither hashKey nor sortKey, handle it
-            uint32_t hash_num = (uint32_t)pegasus_key_hash(std::move(key));
-            if ((hash_num & _partition_version) != _partition_id) {
-                return true;
+            if(key.size() >= 2){
+                uint32_t hash_num = (uint32_t)pegasus_key_hash(key);
+                if ((hash_num & _partition_version) != _partition_id) {
+                    ddebug("this value will be removed, hash_num is %d, _partition_version=%d, _partition_id=%d",
+                           hash_num,
+                           _partition_version.load(),
+                           _partition_id);
+                    return true;
+                }
             }
         }
         return false;
