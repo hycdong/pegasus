@@ -173,6 +173,41 @@ static command_executor commands[] = {
         data_operations,
     },
     {
+        "incr",
+        "atomically increment value of a key",
+        "<hash_key> <sort_key> [increment]",
+        data_operations,
+    },
+    {
+        "check_and_set",
+        "atomically check and set value",
+        "<hash_key> "
+        "[-c|--check_sort_key str] "
+        "[-t|--check_type not_exist|not_exist_or_empty|exist|not_empty] "
+        "[match_anywhere|match_prefix|match_postfix] "
+        "[bytes_less|bytes_less_or_equal|bytes_equal|bytes_greater_or_equal|bytes_greater] "
+        "[int_less|int_less_or_equal|int_equal|int_greater_or_equal|int_greater] "
+        "[-o|--check_operand str] "
+        "[-s|--set_sort_key str] "
+        "[-v|--set_value str] "
+        "[-l|--set_value_ttl_seconds num] "
+        "[-r|--return_check_value]",
+        data_operations,
+    },
+    {
+        "check_and_mutate",
+        "atomically check and mutate",
+        "<hash_key> "
+        "[-c|--check_sort_key str] "
+        "[-t|--check_type not_exist|not_exist_or_empty|exist|not_empty] "
+        "[match_anywhere|match_prefix|match_postfix] "
+        "[bytes_less|bytes_less_or_equal|bytes_equal|bytes_greater_or_equal|bytes_greater] "
+        "[int_less|int_less_or_equal|int_equal|int_greater_or_equal|int_greater] "
+        "[-o|--check_operand str] "
+        "[-r|--return_check_value]",
+        data_operations,
+    },
+    {
         "exist", "check value exist", "<hash_key> <sort_key>", data_operations,
     },
     {
@@ -188,8 +223,8 @@ static command_executor commands[] = {
         "[-a|--start_inclusive true|false] [-b|--stop_inclusive true|false] "
         "[-s|--sort_key_filter_type anywhere|prefix|postfix] "
         "[-y|--sort_key_filter_pattern str] "
-        "[-o|--output file_name] [-n|--max_count num] [-t|--timeout_ms num] "
-        "[-d|--detailed] [-i|--no_value]",
+        "[-o|--output file_name] [-z|--batch_size num] [-n|--max_count num] "
+        "[-t|--timeout_ms num] [-d|--detailed] [-i|--no_value]",
         data_operations,
     },
     {
@@ -199,15 +234,16 @@ static command_executor commands[] = {
         "[-x|--hash_key_filter_pattern str] "
         "[-s|--sort_key_filter_type anywhere|prefix|postfix] "
         "[-y|--sort_key_filter_pattern str] "
-        "[-o|--output file_name] [-n|--max_count num] [-t|--timeout_ms num] "
-        "[-d|--detailed] [-i|--no_value] [-p|--partition num]",
+        "[-o|--output file_name] [-z|--batch_size num] [-n|--max_count num] "
+        "[-t|--timeout_ms num] [-d|--detailed] [-i|--no_value] [-p|--partition num]",
         data_operations,
     },
     {
         "copy_data",
         "copy app data",
         "<-c|--target_cluster_name str> <-a|--target_app_name str> "
-        "[-s|--max_split_count num] [-b|--max_batch_count num] [-t|--timeout_ms num]",
+        "[-s|--max_split_count num] [-b|--max_batch_count num] [-t|--timeout_ms num] "
+        "[-g|--geo_data]",
         data_operations,
     },
     {
@@ -245,7 +281,10 @@ static command_executor commands[] = {
         server_stat,
     },
     {
-        "app_stat", "get stat of apps", "[-a|--app_name str] [-o|--output file_name]", app_stat,
+        "app_stat",
+        "get stat of apps",
+        "[-a|--app_name str] [-q|--only_qps] [-o|--output file_name]",
+        app_stat,
     },
     {
         "flush_log",
@@ -336,7 +375,14 @@ static command_executor commands[] = {
         "del_app_envs", "delete current app envs", "<key> [key...]", del_app_envs,
     },
     {
-        "clear_app_envs", "clear current app envs", "<-a|--all> <-p|--prefix str>", clear_app_envs,
+        "clear_app_envs", "clear current app envs", "[-a|--all] [-p|--prefix str]", clear_app_envs,
+    },
+    {
+        "ddd_diagnose",
+        "diagnose three-dead partitions",
+        "[-g|--gpid appid|appid.pidx] [-d|--diagnose] [-a|--auto_diagnose] "
+        "[-s|--skip_prompt] [-o|--output file_name]",
+        ddd_diagnose,
     },
     {
         "partition_split",
@@ -438,7 +484,7 @@ static char *hintsCallback(const char *buf, int *color, int *bold)
 
     /* Check if the argument list is empty and return ASAP. */
     if (argc == 0) {
-        return NULL;
+        return nullptr;
     }
 
     size_t buflen = strlen(buf);
@@ -461,7 +507,7 @@ static char *hintsCallback(const char *buf, int *color, int *bold)
             return hint;
         }
     }
-    return NULL;
+    return nullptr;
 }
 
 /* Linenoise free hints callback. */
@@ -483,18 +529,24 @@ void initialize(int argc, char **argv)
     }
 
     std::string cluster_name = argc > 2 ? argv[2] : "mycluster";
-    std::cout << "The cluster name is: " << cluster_name << std::endl;
-
     s_global_context.current_cluster_name = cluster_name;
     std::string section = "uri-resolver.dsn://" + s_global_context.current_cluster_name;
     std::string key = "arguments";
     std::string server_list = dsn_config_get_value_string(section.c_str(), key.c_str(), "", "");
-    std::cout << "The cluster meta list is: " << server_list << std::endl;
 
     dsn::replication::replica_helper::load_meta_servers(
         s_global_context.meta_list, section.c_str(), key.c_str());
     s_global_context.ddl_client.reset(
         new dsn::replication::replication_ddl_client(s_global_context.meta_list));
+
+    // get real cluster name from zk
+    std::string name;
+    ::dsn::error_code err = s_global_context.ddl_client->cluster_name(1000, name);
+    if (err == dsn::ERR_OK) {
+        cluster_name = name;
+    }
+    std::cout << "The cluster name is: " << cluster_name << std::endl;
+    std::cout << "The cluster meta list is: " << server_list << std::endl;
 
     linenoiseSetMultiLine(1);
     linenoiseSetCompletionCallback(completionCallback);
@@ -512,7 +564,7 @@ void run()
         sds *args = scanfCommand(&arg_count);
         auto cleanup = dsn::defer([args, arg_count] { sdsfreesplitres(args, arg_count); });
 
-        if (args == NULL) {
+        if (args == nullptr) {
             printf("Invalid argument(s)\n");
             continue;
         }
@@ -520,7 +572,11 @@ void run()
         if (arg_count > 0) {
             auto iter = s_commands_map.find(args[0]);
             if (iter != s_commands_map.end()) {
+                // command executions(e.g. check_and_mutate) may have the different hints, so cancel
+                // the commands hints temporarily
+                linenoiseSetHintsCallback(nullptr);
                 execute_command(iter->second, arg_count, args);
+                linenoiseSetHintsCallback(hintsCallback);
             } else {
                 std::cout << "ERROR: invalid subcommand '" << args[0] << "'" << std::endl;
                 print_help();

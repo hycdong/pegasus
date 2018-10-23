@@ -13,19 +13,20 @@
 #include <boost/algorithm/string.hpp>
 #include <rocksdb/db.h>
 #include <rocksdb/sst_dump_tool.h>
-#include <dsn/tool/cli/cli.client.h>
+#include <dsn/dist/cli/cli.client.h>
 #include <dsn/dist/replication/replication_ddl_client.h>
 #include <dsn/dist/replication/mutation_log_tool.h>
+#include <dsn/perf_counter/perf_counter_utils.h>
 
 #include <rrdb/rrdb.code.definition.h>
 #include <pegasus/version.h>
 #include <pegasus/git_commit.h>
 #include <pegasus/error.h>
+#include <geo/lib/geo_client.h>
 
 #include "base/pegasus_key_schema.h"
 #include "base/pegasus_value_schema.h"
 #include "base/pegasus_utils.h"
-#include "base/counter_utils.h"
 
 #include "command_executor.h"
 #include "command_utils.h"
@@ -45,7 +46,8 @@ enum scan_data_operator
 {
     SCAN_COPY,
     SCAN_CLEAR,
-    SCAN_COUNT
+    SCAN_COUNT,
+    SCAN_GEN_GEO
 };
 class top_container
 {
@@ -99,6 +101,7 @@ struct scan_data_context
     int timeout_ms;
     pegasus::pegasus_client::pegasus_scanner_wrapper scanner;
     pegasus::pegasus_client *client;
+    pegasus::geo::geo_client *geoclient;
     std::atomic_bool *error_occurred;
     std::atomic_long split_rows;
     std::atomic_long split_request_count;
@@ -119,6 +122,7 @@ struct scan_data_context
                       int timeout_ms_,
                       pegasus::pegasus_client::pegasus_scanner_wrapper scanner_,
                       pegasus::pegasus_client *client_,
+                      pegasus::geo::geo_client *geoclient_,
                       std::atomic_bool *error_occurred_,
                       bool stat_size_ = false,
                       int top_count_ = 0)
@@ -128,6 +132,7 @@ struct scan_data_context
           timeout_ms(timeout_ms_),
           scanner(scanner_),
           client(client_),
+          geoclient(geoclient_),
           error_occurred(error_occurred_),
           split_rows(0),
           split_request_count(0),
@@ -236,6 +241,31 @@ inline void scan_data_next(scan_data_context *context)
                     }
                     scan_data_next(context);
                     break;
+                case SCAN_GEN_GEO:
+                    context->split_request_count++;
+                    context->geoclient->async_set(
+                        hash_key,
+                        sort_key,
+                        value,
+                        [context](int err, pegasus::pegasus_client::internal_info &&info) {
+                            if (err != pegasus::PERR_OK) {
+                                if (!context->split_completed.exchange(true)) {
+                                    fprintf(stderr,
+                                            "ERROR: split[%d] async set failed: %s\n",
+                                            context->split_id,
+                                            context->client->get_error_string(err));
+                                    context->error_occurred->store(true);
+                                }
+                            } else {
+                                context->split_rows++;
+                                scan_data_next(context);
+                            }
+                            // should put "split_request_count--" at end of the scope,
+                            // to prevent that split_request_count becomes 0 in the middle.
+                            context->split_request_count--;
+                        },
+                        context->timeout_ms);
+                    break;
                 default:
                     dassert(false, "op = %d", context->op);
                     break;
@@ -300,7 +330,7 @@ inline void call_remote_command(shell_context *sc,
     results.resize(nodes.size());
     for (int i = 0; i < nodes.size(); ++i) {
         auto callback = [&results,
-                         i](::dsn::error_code err, dsn_message_t req, dsn_message_t resp) {
+                         i](::dsn::error_code err, dsn::message_ex *req, dsn::message_ex *resp) {
             if (err == ::dsn::ERR_OK) {
                 results[i].first = true;
                 ::dsn::unmarshall(resp, results[i].second);
@@ -344,6 +374,9 @@ struct row_data
     double multi_put_qps;
     double remove_qps;
     double multi_remove_qps;
+    double incr_qps;
+    double check_and_set_qps;
+    double check_and_mutate_qps;
     double scan_qps;
     double recent_expire_count;
     double recent_filter_count;
@@ -357,6 +390,9 @@ struct row_data
           multi_put_qps(0),
           remove_qps(0),
           multi_remove_qps(0),
+          incr_qps(0),
+          check_and_set_qps(0),
+          check_and_mutate_qps(0),
           scan_qps(0),
           recent_expire_count(0),
           recent_filter_count(0),
@@ -381,6 +417,12 @@ update_app_pegasus_perf_counter(row_data &row, const std::string &counter_name, 
         row.remove_qps += value;
     else if (counter_name == "multi_remove_qps")
         row.multi_remove_qps += value;
+    else if (counter_name == "incr_qps")
+        row.incr_qps += value;
+    else if (counter_name == "check_and_set_qps")
+        row.check_and_set_qps += value;
+    else if (counter_name == "check_and_mutate_qps")
+        row.check_and_mutate_qps += value;
     else if (counter_name == "scan_qps")
         row.scan_qps += value;
     else if (counter_name == "recent.expire.count")
@@ -472,9 +514,9 @@ get_app_stat(shell_context *sc, const std::string &app_name, std::vector<row_dat
                 derror("query perf counter info from node %s failed", node_addr.to_string());
                 return true;
             }
-            pegasus::perf_counter_info info;
+            dsn::perf_counter_info info;
             dsn::blob bb(results[i].second.data(), 0, results[i].second.size());
-            if (!dsn::json::json_forwarder<pegasus::perf_counter_info>::decode(bb, info)) {
+            if (!dsn::json::json_forwarder<dsn::perf_counter_info>::decode(bb, info)) {
                 derror("decode perf counter info from node %s failed, result = %s",
                        node_addr.to_string(),
                        results[i].second.c_str());
@@ -486,7 +528,7 @@ get_app_stat(shell_context *sc, const std::string &app_name, std::vector<row_dat
                        info.result.c_str());
                 return true;
             }
-            for (pegasus::perf_counter_metric &m : info.counters) {
+            for (dsn::perf_counter_metric &m : info.counters) {
                 int32_t app_id_x, partition_index_x;
                 std::string counter_name;
                 bool parse_ret = parse_app_pegasus_perf_counter_name(
@@ -526,9 +568,9 @@ get_app_stat(shell_context *sc, const std::string &app_name, std::vector<row_dat
                 derror("query perf counter info from node %s failed", node_addr.to_string());
                 return true;
             }
-            pegasus::perf_counter_info info;
+            dsn::perf_counter_info info;
             dsn::blob bb(results[i].second.data(), 0, results[i].second.size());
-            if (!dsn::json::json_forwarder<pegasus::perf_counter_info>::decode(bb, info)) {
+            if (!dsn::json::json_forwarder<dsn::perf_counter_info>::decode(bb, info)) {
                 derror("decode perf counter info from node %s failed, result = %s",
                        node_addr.to_string(),
                        results[i].second.c_str());
@@ -540,7 +582,7 @@ get_app_stat(shell_context *sc, const std::string &app_name, std::vector<row_dat
                        info.result.c_str());
                 return true;
             }
-            for (pegasus::perf_counter_metric &m : info.counters) {
+            for (dsn::perf_counter_metric &m : info.counters) {
                 int32_t app_id_x, partition_index_x;
                 std::string counter_name;
                 bool parse_ret = parse_app_pegasus_perf_counter_name(

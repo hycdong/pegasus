@@ -7,6 +7,7 @@
 #include <time.h>
 #include <cctype>
 #include <cstring>
+#include <queue>
 #include <boost/lexical_cast.hpp>
 #include <dsn/tool-api/rpc_address.h>
 #include <dsn/utility/string_view.h>
@@ -22,31 +23,36 @@ inline uint32_t epoch_now() { return time(nullptr) - epoch_begin; }
 // extract "host" from rpc_address
 void addr2host(const ::dsn::rpc_address &addr, char *str, int len);
 
-// parse int from string
-bool buf2int(const char *buffer, int length, int &result);
-bool buf2int64(const char *buffer, int length, int64_t &result);
-
-// parse bool from string, must be "true" or "false".
-bool buf2bool(const char *buffer, int length, bool &result);
-
-// three-way comparison, returns value:
-//   <  0 iff "a" <  "b",
-//   == 0 iff "a" == "b",
-//   >  0 iff "a" >  "b"
-// T must support data() and length() method.
-template <class T>
-int binary_compare(const T &a, const T &b)
+template <typename elem_type, typename compare = std::less<elem_type>>
+class top_n
 {
-    size_t min_len = (a.length() < b.length()) ? a.length() : b.length();
-    int r = ::memcmp(a.data(), b.data(), min_len);
-    if (r == 0) {
-        if (a.length() < b.length())
-            r = -1;
-        else if (a.length() > b.length())
-            r = +1;
+public:
+    typedef typename std::priority_queue<elem_type, std::vector<elem_type>, compare>
+        data_priority_queue;
+
+    top_n(const std::list<elem_type> &data, int n)
+    {
+        for (const auto &r : data) {
+            _queue.emplace(r);
+            if (_queue.size() > n) {
+                _queue.pop();
+            }
+        }
     }
-    return r;
-}
+
+    std::list<elem_type> to()
+    {
+        std::list<elem_type> result;
+        while (!_queue.empty()) {
+            result.emplace_front(_queue.top());
+            _queue.pop();
+        }
+        return std::move(result);
+    }
+
+protected:
+    data_priority_queue _queue;
+};
 
 // ----------------------------------------------------------------------
 // c_escape_string()
@@ -83,5 +89,5 @@ inline dsn::string_view to_string_view(rocksdb::Slice s) { return {s.data(), s.s
 
 inline rocksdb::Slice to_rocksdb_slice(dsn::string_view s) { return {s.data(), s.size()}; }
 
-}
-} // namespace
+} // namespace utils
+} // namespace pegasus

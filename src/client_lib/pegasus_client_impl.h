@@ -28,7 +28,7 @@ public:
                     const std::string &value,
                     int timeout_milliseconds = 5000,
                     int ttl_seconds = 0,
-                    internal_info *info = NULL) override;
+                    internal_info *info = nullptr) override;
 
     virtual void async_set(const std::string &hashkey,
                            const std::string &sortkey,
@@ -41,7 +41,7 @@ public:
                           const std::map<std::string, std::string> &kvs,
                           int timeout_milliseconds = 5000,
                           int ttl_seconds = 0,
-                          internal_info *info = NULL) override;
+                          internal_info *info = nullptr) override;
 
     virtual void async_multi_set(const std::string &hashkey,
                                  const std::map<std::string, std::string> &kvs,
@@ -53,7 +53,7 @@ public:
                     const std::string &sortkey,
                     std::string &value,
                     int timeout_milliseconds = 5000,
-                    internal_info *info = NULL) override;
+                    internal_info *info = nullptr) override;
 
     virtual void async_get(const std::string &hashkey,
                            const std::string &sortkey,
@@ -66,7 +66,7 @@ public:
                           int max_fetch_count = 100,
                           int max_fetch_size = 1000000,
                           int timeout_milliseconds = 5000,
-                          internal_info *info = NULL) override;
+                          internal_info *info = nullptr) override;
 
     virtual void async_multi_get(const std::string &hashkey,
                                  const std::set<std::string> &sortkeys,
@@ -83,7 +83,7 @@ public:
                           int max_fetch_count = 100,
                           int max_fetch_size = 1000000,
                           int timeout_milliseconds = 5000,
-                          internal_info *info = NULL) override;
+                          internal_info *info = nullptr) override;
 
     virtual void async_multi_get(const std::string &hashkey,
                                  const std::string &start_sortkey,
@@ -99,7 +99,7 @@ public:
                                    int max_fetch_count = 100,
                                    int max_fetch_size = 1000000,
                                    int timeout_milliseconds = 5000,
-                                   internal_info *info = NULL) override;
+                                   internal_info *info = nullptr) override;
 
     virtual void async_multi_get_sortkeys(const std::string &hashkey,
                                           async_multi_get_sortkeys_callback_t &&callback = nullptr,
@@ -110,17 +110,17 @@ public:
     virtual int exist(const std::string &hashkey,
                       const std::string &sortkey,
                       int timeout_milliseconds = 5000,
-                      internal_info *info = NULL) override;
+                      internal_info *info = nullptr) override;
 
     virtual int sortkey_count(const std::string &hashkey,
                               int64_t &count,
                               int timeout_milliseconds = 5000,
-                              internal_info *info = NULL) override;
+                              internal_info *info = nullptr) override;
 
     virtual int del(const std::string &hashkey,
                     const std::string &sortkey,
                     int timeout_milliseconds = 5000,
-                    internal_info *info = NULL) override;
+                    internal_info *info = nullptr) override;
 
     virtual void async_del(const std::string &hashkey,
                            const std::string &sortkey,
@@ -131,18 +131,73 @@ public:
                           const std::set<std::string> &sortkeys,
                           int64_t &deleted_count,
                           int timeout_milliseconds = 5000,
-                          internal_info *info = NULL) override;
+                          internal_info *info = nullptr) override;
 
     virtual void async_multi_del(const std::string &hashkey,
                                  const std::set<std::string> &sortkeys,
                                  async_multi_del_callback_t &&callback = nullptr,
                                  int timeout_milliseconds = 5000) override;
 
+    virtual int incr(const std::string &hashkey,
+                     const std::string &sortkey,
+                     int64_t increment,
+                     int64_t &new_value,
+                     int timeout_milliseconds = 5000,
+                     int ttl_seconds = 0,
+                     internal_info *info = nullptr) override;
+
+    virtual void async_incr(const std::string &hashkey,
+                            const std::string &sortkey,
+                            int64_t increment,
+                            async_incr_callback_t &&callback = nullptr,
+                            int timeout_milliseconds = 5000,
+                            int ttl_seconds = 0) override;
+
+    virtual int check_and_set(const std::string &hash_key,
+                              const std::string &check_sort_key,
+                              cas_check_type check_type,
+                              const std::string &check_operand,
+                              const std::string &set_sort_key,
+                              const std::string &set_value,
+                              const check_and_set_options &options,
+                              check_and_set_results &results,
+                              int timeout_milliseconds = 5000,
+                              internal_info *info = nullptr) override;
+
+    virtual void async_check_and_set(const std::string &hash_key,
+                                     const std::string &check_sort_key,
+                                     cas_check_type check_type,
+                                     const std::string &check_operand,
+                                     const std::string &set_sort_key,
+                                     const std::string &set_value,
+                                     const check_and_set_options &options,
+                                     async_check_and_set_callback_t &&callback = nullptr,
+                                     int timeout_milliseconds = 5000) override;
+
+    virtual int check_and_mutate(const std::string &hash_key,
+                                 const std::string &check_sort_key,
+                                 cas_check_type check_type,
+                                 const std::string &check_operand,
+                                 const mutations &mutations,
+                                 const check_and_mutate_options &options,
+                                 check_and_mutate_results &results,
+                                 int timeout_milliseconds = 5000,
+                                 internal_info *info = nullptr) override;
+
+    virtual void async_check_and_mutate(const std::string &hash_key,
+                                        const std::string &check_sort_key,
+                                        cas_check_type check_type,
+                                        const std::string &check_operand,
+                                        const mutations &mutations,
+                                        const check_and_mutate_options &options,
+                                        async_check_and_mutate_callback_t &&callback = nullptr,
+                                        int timeout_milliseconds = 5000) override;
+
     virtual int ttl(const std::string &hashkey,
                     const std::string &sortkey,
                     int &ttl_seconds,
                     int timeout_milliseconds = 5000,
-                    internal_info *info = NULL) override;
+                    internal_info *info = nullptr) override;
 
     virtual int get_scanner(const std::string &hashkey,
                             const std::string &start_sortkey,
@@ -175,7 +230,7 @@ public:
         int next(std::string &hashkey,
                  std::string &sortkey,
                  std::string &value,
-                 internal_info *info = NULL) override;
+                 internal_info *info = nullptr) override;
 
         void async_next(async_scan_next_callback_t &&) override;
 
@@ -217,7 +272,7 @@ public:
         void _async_next_internal();
         void _start_scan();
         void _next_batch();
-        void _on_scan_response(::dsn::error_code, dsn_message_t, dsn_message_t);
+        void _on_scan_response(::dsn::error_code, dsn::message_ex *, dsn::message_ex *);
         void _split_reset();
 
     private:
@@ -269,5 +324,5 @@ private:
     ///
     static std::unordered_map<int, int> _server_error_to_client;
 };
-}
-} // namespace
+} // namespace client
+} // namespace pegasus

@@ -69,9 +69,11 @@ upgrade_testor::upgrade_testor()
         section, "upgrade_replica_max_count", _total_replica_count, "replica upgradeed max count");
     _upgrade_meta_max_count = (int32_t)dsn_config_get_value_uint64(
         section, "upgrade_meta_max_count", _total_meta_count, "meta upgradeed max count");
-    _upgrade_zk_max_count = (int32_t)dsn_config_get_value_uint64(
-        section, "upgrade_zookeeper_max_count", _total_zookeeper_count, "zookeeper upgradeed max count");
-    srand((unsigned)time(NULL));
+    _upgrade_zk_max_count = (int32_t)dsn_config_get_value_uint64(section,
+                                                                 "upgrade_zookeeper_max_count",
+                                                                 _total_zookeeper_count,
+                                                                 "zookeeper upgradeed max count");
+    srand((unsigned)time(nullptr));
 }
 
 upgrade_testor::~upgrade_testor() {}
@@ -125,7 +127,8 @@ void upgrade_testor::run()
     ddebug("************************");
     ddebug("Round [%d]", upgrade_round);
     ddebug("start upgrade...");
-    ddebug("upgrade meta number=%d, replica number=%d, zk number=%d", meta_cnt, replica_cnt, zk_cnt);
+    ddebug(
+        "upgrade meta number=%d, replica number=%d, zk number=%d", meta_cnt, replica_cnt, zk_cnt);
 
     if (!upgrade(replica_cnt)) {
         stop_verifier_and_exit("upgrade jobs failed");
@@ -149,11 +152,14 @@ bool upgrade_testor::upgrade(int replica_cnt)
     std::vector<int> total_count = {
         _total_meta_count, _total_replica_count, _total_zookeeper_count};
     std::vector<int> random_idxs;
-    generate_random(random_idxs, 1 /*REPLICA - REPLICA + 1*/, REPLICA, REPLICA);        // 生成type列表
+    generate_random(random_idxs, 1 /*REPLICA - REPLICA + 1*/, REPLICA, REPLICA); // 生成type列表
     for (auto id : random_idxs) {
         std::vector<int> &job_index_to_upgrade = _job_index_to_upgrade[_job_types[id]];
         job_index_to_upgrade.clear();
-        generate_random(job_index_to_upgrade, upgrade_counts[id], 1, total_count[id]);  // 生成该type需要upgrade的index列表
+        generate_random(job_index_to_upgrade,
+                        upgrade_counts[id],
+                        1,
+                        total_count[id]); // 生成该type需要upgrade的index列表
         for (auto index : job_index_to_upgrade) {
             ddebug("start to upgrade %s@%d", job_type_str(_job_types[id]), index);
             if (!upgrade_job_by_index(_job_types[id], index)) {

@@ -15,13 +15,14 @@ set(MY_PROJ_INC_PATH "")
 set(MY_PROJ_LIBS
     dsn_replica_server
     dsn_meta_server
-    dsn.replication.clientlib
+    dsn_replication_common
     dsn.replication.ddlclient
     dsn.block_service.local
     dsn.block_service.fds
     dsn.failure_detector
     dsn.failure_detector.multimaster
     dsn.replication.zookeeper_provider
+    pegasus_reporter
     pegasus_client_static
     zookeeper_mt
     event
@@ -40,7 +41,7 @@ else()
     set(MY_PROJ_LIBS rocksdblib ${MY_PROJ_LIBS} rpcrt4)
 endif()
 
-set(MY_PROJ_LIB_PATH "../../rocksdb")
+set(MY_PROJ_LIB_PATH "../../rocksdb/build")
 
 set(MY_BOOST_PACKAGES system filesystem)
 
@@ -50,5 +51,7 @@ if (UNIX)
     SET(CMAKE_INSTALL_RPATH ".")
     SET(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 endif()
+
+add_definitions(-Wno-attributes)
 
 dsn_add_executable()

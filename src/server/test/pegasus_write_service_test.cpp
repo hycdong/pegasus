@@ -25,6 +25,8 @@ public:
 
     void test_multi_put()
     {
+        dsn::fail::setup();
+
         dsn::apps::multi_put_request request;
         dsn::apps::update_response response;
 
@@ -33,8 +35,9 @@ public:
 
         // alarm for empty request
         request.hash_key = dsn::blob(hash_key.data(), 0, hash_key.size());
-        _write_svc->multi_put(decree, request, response);
-        ASSERT_EQ(response.error, rocksdb::Status::kInvalidArgument);
+        int err = _write_svc->multi_put(decree, request, response);
+        ASSERT_EQ(err, 0);
+        verify_response(response, rocksdb::Status::kInvalidArgument, decree);
 
         constexpr int kv_num = 100;
         std::string sort_key[kv_num];
@@ -51,11 +54,27 @@ public:
             request.kvs.back().value.assign(value[i].data(), 0, value[i].size());
         }
 
-        _write_svc->multi_put(decree, request, response);
-        ASSERT_EQ(response.error, 0);
-        ASSERT_EQ(response.app_id, _gpid.get_app_id());
-        ASSERT_EQ(response.partition_index, _gpid.get_partition_index());
-        ASSERT_EQ(response.decree, decree);
+        {
+            dsn::fail::cfg("db_write_batch_put", "100%1*return()");
+            err = _write_svc->multi_put(decree, request, response);
+            ASSERT_EQ(err, FAIL_DB_WRITE_BATCH_PUT);
+            verify_response(response, err, decree);
+        }
+
+        {
+            dsn::fail::cfg("db_write", "100%1*return()");
+            err = _write_svc->multi_put(decree, request, response);
+            ASSERT_EQ(err, FAIL_DB_WRITE);
+            verify_response(response, err, decree);
+        }
+
+        { // success
+            err = _write_svc->multi_put(decree, request, response);
+            ASSERT_EQ(err, 0);
+            verify_response(response, 0, decree);
+        }
+
+        dsn::fail::teardown();
     }
 
     void test_multi_remove()
@@ -68,8 +87,9 @@ public:
 
         // alarm for empty request
         request.hash_key = dsn::blob(hash_key.data(), 0, hash_key.size());
-        _write_svc->multi_remove(decree, request, response);
-        ASSERT_EQ(response.error, rocksdb::Status::kInvalidArgument);
+        int err = _write_svc->multi_remove(decree, request, response);
+        ASSERT_EQ(err, 0);
+        verify_response(response, rocksdb::Status::kInvalidArgument, decree);
 
         constexpr int kv_num = 100;
         std::string sort_key[kv_num];
@@ -83,11 +103,25 @@ public:
             request.sort_keys.back().assign(sort_key[i].data(), 0, sort_key[i].size());
         }
 
-        _write_svc->multi_remove(decree, request, response);
-        ASSERT_EQ(response.error, 0);
-        ASSERT_EQ(response.app_id, _gpid.get_app_id());
-        ASSERT_EQ(response.partition_index, _gpid.get_partition_index());
-        ASSERT_EQ(response.decree, decree);
+        {
+            dsn::fail::cfg("db_write_batch_delete", "100%1*return()");
+            err = _write_svc->multi_remove(decree, request, response);
+            ASSERT_EQ(err, FAIL_DB_WRITE_BATCH_DELETE);
+            verify_response(response, err, decree);
+        }
+
+        {
+            dsn::fail::cfg("db_write", "100%1*return()");
+            err = _write_svc->multi_remove(decree, request, response);
+            ASSERT_EQ(err, FAIL_DB_WRITE);
+            verify_response(response, err, decree);
+        }
+
+        { // success
+            err = _write_svc->multi_remove(decree, request, response);
+            ASSERT_EQ(err, 0);
+            verify_response(response, 0, decree);
+        }
     }
 
     void test_batched_writes()
@@ -110,24 +144,33 @@ public:
         // of response may be changed due to capacity increase.
         std::array<dsn::apps::update_response, kv_num> responses;
         {
-            _write_svc->batch_prepare();
+            _write_svc->batch_prepare(decree);
             for (int i = 0; i < kv_num; i++) {
                 dsn::apps::update_request req;
                 req.key = key[i];
-                _write_svc->batch_put(req, responses[i]);
+                _write_svc->batch_put(decree, req, responses[i]);
             }
             for (int i = 0; i < kv_num; i++) {
-                _write_svc->batch_remove(key[i], responses[i]);
+                _write_svc->batch_remove(decree, key[i], responses[i]);
             }
             _write_svc->batch_commit(decree);
         }
 
         for (const dsn::apps::update_response &resp : responses) {
-            ASSERT_EQ(resp.error, 0);
-            ASSERT_EQ(resp.app_id, _gpid.get_app_id());
-            ASSERT_EQ(resp.partition_index, _gpid.get_partition_index());
-            ASSERT_EQ(resp.decree, decree);
+            verify_response(resp, 0, decree);
         }
+    }
+
+    template <typename TResponse>
+    void verify_response(const TResponse &response, int err, int64_t decree)
+    {
+        ASSERT_EQ(response.error, err);
+        ASSERT_EQ(response.app_id, _gpid.get_app_id());
+        ASSERT_EQ(response.partition_index, _gpid.get_partition_index());
+        ASSERT_EQ(response.decree, decree);
+        ASSERT_EQ(response.server, _write_svc->_impl->_primary_address);
+        ASSERT_EQ(_write_svc->_impl->_batch.Count(), 0);
+        ASSERT_EQ(_write_svc->_impl->_update_responses.size(), 0);
     }
 };
 

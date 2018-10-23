@@ -13,7 +13,9 @@
 #include <rocksdb/db.h>
 #include <rocksdb/sst_dump_tool.h>
 #include <dsn/utility/filesystem.h>
-#include <dsn/tool/cli/cli.client.h>
+#include <dsn/utility/string_conv.h>
+#include <dsn/utility/string_view.h>
+#include <dsn/dist/cli/cli.client.h>
 #include <dsn/dist/replication/replication_ddl_client.h>
 #include <dsn/dist/replication/mutation_log_tool.h>
 
@@ -37,24 +39,6 @@ inline bool version(command_executor *e, shell_context *sc, arguments args)
         << PEGASUS_BUILD_TYPE;
     std::cout << oss.str() << std::endl;
     return true;
-}
-
-inline bool
-buf2filter_type(const char *buffer, int length, pegasus::pegasus_client::filter_type &result)
-{
-    if (length == 8 && strncmp(buffer, "anywhere", 8) == 0) {
-        result = pegasus::pegasus_client::FT_MATCH_ANYWHERE;
-        return true;
-    }
-    if (length == 6 && strncmp(buffer, "prefix", 6) == 0) {
-        result = pegasus::pegasus_client::FT_MATCH_PREFIX;
-        return true;
-    }
-    if (length == 7 && strncmp(buffer, "postfix", 7) == 0) {
-        result = pegasus::pegasus_client::FT_MATCH_POSTFIX;
-        return true;
-    }
-    return false;
 }
 
 inline bool query_cluster_info(command_executor *e, shell_context *sc, arguments args)
@@ -163,7 +147,7 @@ inline bool ls_apps(command_executor *e, shell_context *sc, arguments args)
     ::dsn::app_status::type s = ::dsn::app_status::AS_INVALID;
     if (!status.empty() && status != "all") {
         s = type_from_string(::dsn::_app_status_VALUES_TO_NAMES,
-                             std::string("AS_") + status,
+                             std::string("as_") + status,
                              ::dsn::app_status::AS_INVALID);
         verify_logged(s != ::dsn::app_status::AS_INVALID,
                       "parse %s as app_status::type failed",
@@ -257,13 +241,13 @@ inline bool create_app(command_executor *e, shell_context *sc, arguments args)
             break;
         switch (c) {
         case 'p':
-            if (!::pegasus::utils::buf2int(optarg, strlen(optarg), pc)) {
+            if (!dsn::buf2int32(optarg, pc)) {
                 fprintf(stderr, "parse %s as partition_count failed\n", optarg);
                 return false;
             }
             break;
         case 'r':
-            if (!::pegasus::utils::buf2int(optarg, strlen(optarg), rc)) {
+            if (!dsn::buf2int32(optarg, rc)) {
                 fprintf(stderr, "parse %s as replica_count failed\n", optarg);
                 return false;
             }
@@ -309,7 +293,7 @@ inline bool drop_app(command_executor *e, shell_context *sc, arguments args)
             break;
         switch (c) {
         case 'r':
-            if (!::pegasus::utils::buf2int(optarg, strlen(optarg), reserve_seconds)) {
+            if (!dsn::buf2int32(optarg, reserve_seconds)) {
                 fprintf(stderr, "parse %s as reserve_seconds failed\n", optarg);
                 return false;
             }
@@ -335,7 +319,7 @@ inline bool recall_app(command_executor *e, shell_context *sc, arguments args)
 
     int id;
     std::string new_name = "";
-    if (!::pegasus::utils::buf2int(args.argv[1], strlen(args.argv[1]), id)) {
+    if (!dsn::buf2int32(args.argv[1], id)) {
         fprintf(stderr, "ERROR: parse %s as id failed\n", args.argv[1]);
         return false;
     }
@@ -590,7 +574,7 @@ inline bool process_timeout(command_executor *e, shell_context *sc, arguments ar
         return true;
     } else if (args.argc == 2) {
         int timeout;
-        if (!::pegasus::utils::buf2int(args.argv[1], strlen(args.argv[1]), timeout)) {
+        if (!dsn::buf2int32(args.argv[1], timeout)) {
             fprintf(stderr, "ERROR: parse %s as timeout failed\n", args.argv[1]);
             return false;
         }
@@ -776,19 +760,23 @@ inline bool multi_get_range(command_executor *e, shell_context *sc, arguments ar
             break;
         switch (c) {
         case 'a':
-            if (!::pegasus::utils::buf2bool(optarg, strlen(optarg), options.start_inclusive)) {
+            if (!dsn::buf2bool(optarg, options.start_inclusive)) {
                 fprintf(stderr, "invalid start_inclusive param\n");
                 return false;
             }
             break;
         case 'b':
-            if (!::pegasus::utils::buf2bool(optarg, strlen(optarg), options.stop_inclusive)) {
+            if (!dsn::buf2bool(optarg, options.stop_inclusive)) {
                 fprintf(stderr, "invalid stop_inclusive param\n");
                 return false;
             }
             break;
         case 's':
-            if (!buf2filter_type(optarg, strlen(optarg), options.sort_key_filter_type)) {
+            options.sort_key_filter_type = (pegasus::pegasus_client::filter_type)type_from_string(
+                ::dsn::apps::_filter_type_VALUES_TO_NAMES,
+                std::string("ft_match_") + optarg,
+                ::dsn::apps::filter_type::FT_NO_FILTER);
+            if (options.sort_key_filter_type == pegasus::pegasus_client::FT_NO_FILTER) {
                 fprintf(stderr, "invalid sort_key_filter_type param\n");
                 return false;
             }
@@ -798,7 +786,7 @@ inline bool multi_get_range(command_executor *e, shell_context *sc, arguments ar
             options.sort_key_filter_pattern = unescape_str(optarg);
             break;
         case 'n':
-            if (!::pegasus::utils::buf2int(optarg, strlen(optarg), max_count)) {
+            if (!dsn::buf2int32(optarg, max_count)) {
                 fprintf(stderr, "parse %s as max_count failed\n", optarg);
                 return false;
             }
@@ -966,7 +954,7 @@ inline bool set_value(command_executor *e, shell_context *sc, arguments args)
     std::string value = sds_to_string(args.argv[3]);
     int32_t ttl = 0;
     if (args.argc == 5) {
-        if (!::pegasus::utils::buf2int(args.argv[4], strlen(args.argv[4]), ttl)) {
+        if (!dsn::buf2int32(args.argv[4], ttl)) {
             fprintf(stderr, "ERROR: parse %s as ttl failed\n", args.argv[4]);
             return false;
         }
@@ -1114,19 +1102,23 @@ inline bool multi_del_range(command_executor *e, shell_context *sc, arguments ar
             break;
         switch (c) {
         case 'a':
-            if (!::pegasus::utils::buf2bool(optarg, strlen(optarg), options.start_inclusive)) {
+            if (!dsn::buf2bool(optarg, options.start_inclusive)) {
                 fprintf(stderr, "invalid start_inclusive param\n");
                 return false;
             }
             break;
         case 'b':
-            if (!::pegasus::utils::buf2bool(optarg, strlen(optarg), options.stop_inclusive)) {
+            if (!dsn::buf2bool(optarg, options.stop_inclusive)) {
                 fprintf(stderr, "invalid stop_inclusive param\n");
                 return false;
             }
             break;
         case 's':
-            if (!buf2filter_type(optarg, strlen(optarg), options.sort_key_filter_type)) {
+            options.sort_key_filter_type = (pegasus::pegasus_client::filter_type)type_from_string(
+                ::dsn::apps::_filter_type_VALUES_TO_NAMES,
+                std::string("ft_match_") + optarg,
+                ::dsn::apps::filter_type::FT_NO_FILTER);
+            if (options.sort_key_filter_type == pegasus::pegasus_client::FT_NO_FILTER) {
                 fprintf(stderr, "invalid sort_key_filter_type param\n");
                 return false;
             }
@@ -1273,6 +1265,440 @@ inline bool multi_del_range(command_executor *e, shell_context *sc, arguments ar
     return true;
 }
 
+inline bool incr(command_executor *e, shell_context *sc, arguments args)
+{
+    if (args.argc != 3 && args.argc != 4) {
+        return false;
+    }
+
+    std::string hash_key = sds_to_string(args.argv[1]);
+    std::string sort_key = sds_to_string(args.argv[2]);
+    int64_t increment = 1;
+    if (args.argc == 4) {
+        if (!dsn::buf2int64(args.argv[3], increment)) {
+            fprintf(stderr, "ERROR: invalid increment param\n");
+            return false;
+        }
+    }
+
+    int64_t new_value;
+    pegasus::pegasus_client::internal_info info;
+    int ret =
+        sc->pg_client->incr(hash_key, sort_key, increment, new_value, sc->timeout_ms, 0, &info);
+    if (ret != pegasus::PERR_OK) {
+        fprintf(stderr, "ERROR: %s\n", sc->pg_client->get_error_string(ret));
+    } else {
+        fprintf(stderr, "%" PRId64 "\n", new_value);
+    }
+
+    fprintf(stderr, "\n");
+    fprintf(stderr, "app_id          : %d\n", info.app_id);
+    fprintf(stderr, "partition_index : %d\n", info.partition_index);
+    fprintf(stderr, "decree          : %ld\n", info.decree);
+    fprintf(stderr, "server          : %s\n", info.server.c_str());
+    return true;
+}
+
+inline bool check_and_set(command_executor *e, shell_context *sc, arguments args)
+{
+    if (args.argc < 2)
+        return false;
+
+    std::string hash_key = sds_to_string(args.argv[1]);
+    bool check_sort_key_provided = false;
+    std::string check_sort_key;
+    ::dsn::apps::cas_check_type::type check_type = ::dsn::apps::cas_check_type::CT_NO_CHECK;
+    std::string check_type_name;
+    bool check_operand_provided = false;
+    std::string check_operand;
+    bool set_sort_key_provided = false;
+    std::string set_sort_key;
+    bool set_value_provided = false;
+    std::string set_value;
+    pegasus::pegasus_client::check_and_set_options options;
+
+    static struct option long_options[] = {{"check_sort_key", required_argument, 0, 'c'},
+                                           {"check_type", required_argument, 0, 't'},
+                                           {"check_operand", required_argument, 0, 'o'},
+                                           {"set_sort_key", required_argument, 0, 's'},
+                                           {"set_value", required_argument, 0, 'v'},
+                                           {"set_value_ttl_seconds", required_argument, 0, 'l'},
+                                           {"return_check_value", no_argument, 0, 'r'},
+                                           {0, 0, 0, 0}};
+
+    escape_sds_argv(args.argc, args.argv);
+    optind = 0;
+    while (true) {
+        int option_index = 0;
+        int c;
+        c = getopt_long(args.argc, args.argv, "c:t:o:s:v:l:r", long_options, &option_index);
+        if (c == -1)
+            break;
+        switch (c) {
+        case 'c':
+            check_sort_key_provided = true;
+            check_sort_key = unescape_str(optarg);
+            break;
+        case 't':
+            check_type = type_from_string(::dsn::apps::_cas_check_type_VALUES_TO_NAMES,
+                                          std::string("ct_value_") + optarg,
+                                          ::dsn::apps::cas_check_type::CT_NO_CHECK);
+            if (check_type == ::dsn::apps::cas_check_type::CT_NO_CHECK) {
+                fprintf(stderr, "ERROR: invalid check_type param\n");
+                return false;
+            }
+            check_type_name = optarg;
+            break;
+        case 'o':
+            check_operand_provided = true;
+            check_operand = unescape_str(optarg);
+            break;
+        case 's':
+            set_sort_key_provided = true;
+            set_sort_key = unescape_str(optarg);
+            break;
+        case 'v':
+            set_value_provided = true;
+            set_value = unescape_str(optarg);
+            break;
+        case 'l':
+            if (!dsn::buf2int32(optarg, options.set_value_ttl_seconds)) {
+                fprintf(stderr, "ERROR: invalid set_value_ttl_seconds param\n");
+                return false;
+            }
+            break;
+        case 'r':
+            options.return_check_value = true;
+            break;
+        default:
+            return false;
+        }
+    }
+
+    if (!check_sort_key_provided) {
+        fprintf(stderr, "ERROR: check_sort_key not provided\n");
+        return false;
+    }
+    if (check_type == ::dsn::apps::cas_check_type::CT_NO_CHECK) {
+        fprintf(stderr, "ERROR: check_type not provided\n");
+        return false;
+    }
+    if (!check_operand_provided &&
+        check_type >= ::dsn::apps::cas_check_type::CT_VALUE_MATCH_ANYWHERE) {
+        fprintf(stderr, "ERROR: check_operand not provided\n");
+        return false;
+    }
+    if (!set_sort_key_provided) {
+        fprintf(stderr, "ERROR: set_sort_key not provided\n");
+        return false;
+    }
+    if (!set_value_provided) {
+        fprintf(stderr, "ERROR: set_value not provided\n");
+        return false;
+    }
+
+    fprintf(stderr, "hash_key: \"%s\"\n", pegasus::utils::c_escape_string(hash_key).c_str());
+    fprintf(stderr,
+            "check_sort_key: \"%s\"\n",
+            pegasus::utils::c_escape_string(check_sort_key).c_str());
+    fprintf(stderr, "check_type: %s\n", check_type_name.c_str());
+    if (check_type >= ::dsn::apps::cas_check_type::CT_VALUE_MATCH_ANYWHERE) {
+        fprintf(stderr,
+                "check_operand: \"%s\"\n",
+                pegasus::utils::c_escape_string(check_operand).c_str());
+    }
+    fprintf(
+        stderr, "set_sort_key: \"%s\"\n", pegasus::utils::c_escape_string(set_sort_key).c_str());
+    fprintf(stderr, "set_value: \"%s\"\n", pegasus::utils::c_escape_string(set_value).c_str());
+    fprintf(stderr, "set_value_ttl_seconds: %d\n", options.set_value_ttl_seconds);
+    fprintf(stderr, "return_check_value: %s\n", options.return_check_value ? "true" : "false");
+    fprintf(stderr, "\n");
+
+    pegasus::pegasus_client::check_and_set_results results;
+    pegasus::pegasus_client::internal_info info;
+    int ret = sc->pg_client->check_and_set(hash_key,
+                                           check_sort_key,
+                                           (pegasus::pegasus_client::cas_check_type)check_type,
+                                           check_operand,
+                                           set_sort_key,
+                                           set_value,
+                                           options,
+                                           results,
+                                           sc->timeout_ms,
+                                           &info);
+    if (ret != pegasus::PERR_OK) {
+        fprintf(stderr, "ERROR: %s\n", sc->pg_client->get_error_string(ret));
+    } else {
+        if (results.set_succeed) {
+            fprintf(stderr, "Set succeed.\n");
+        } else {
+            fprintf(stderr, "Set failed, because check not passed.\n");
+        }
+        if (results.check_value_returned) {
+            fprintf(stderr, "\n");
+            if (results.check_value_exist) {
+                fprintf(
+                    stderr,
+                    "Check value: \"%s\"\n",
+                    pegasus::utils::c_escape_string(results.check_value, sc->escape_all).c_str());
+            } else {
+                fprintf(stderr, "Check value not exist.\n");
+            }
+        }
+    }
+
+    fprintf(stderr, "\n");
+    fprintf(stderr, "app_id          : %d\n", info.app_id);
+    fprintf(stderr, "partition_index : %d\n", info.partition_index);
+    fprintf(stderr, "decree          : %ld\n", info.decree);
+    fprintf(stderr, "server          : %s\n", info.server.c_str());
+    return true;
+}
+
+inline int mutation_check(int args_count, sds *args)
+{
+    int ret = -2;
+    if (args_count > 0) {
+        std::string op = unescape_str(args[0]);
+        if (op == "abort")
+            ret = -1;
+        else if (op == "ok")
+            ret = 0;
+        else if (op == "set" && (args_count == 3 || args_count == 4))
+            ret = 1;
+        else if (op == "del" && args_count == 2)
+            ret = 2;
+    }
+    return ret;
+}
+
+inline int load_mutations(shell_context *sc, pegasus::pegasus_client::mutations &mutations)
+{
+    while (true) {
+        int arg_count = 0;
+        sds *args = scanfCommand(&arg_count);
+        auto cleanup = dsn::defer([args, arg_count] { sdsfreesplitres(args, arg_count); });
+        escape_sds_argv(arg_count, args);
+
+        std::string sort_key, value;
+        int ttl = 0;
+        int status = mutation_check(arg_count, args);
+        switch (status) {
+        case -1:
+            fprintf(stderr, "INFO: abort loading\n");
+            return -1;
+        case 0:
+            fprintf(stderr, "INFO: load mutations done.\n\n");
+            return 0;
+        case 1: // SET
+            ttl = 0;
+            if (arg_count == 4) {
+                if (!dsn::buf2int32(args[3], ttl)) {
+                    fprintf(stderr,
+                            "ERROR: parse \"%s\" as ttl failed, "
+                            "print \"ok\" to finish loading, print \"abort\" to abort this "
+                            "command\n",
+                            args[3]);
+                    break;
+                }
+                if (ttl <= 0) {
+                    fprintf(stderr,
+                            "ERROR: invalid ttl %s, "
+                            "print \"ok\" to finish loading, print \"abort\" to abort this "
+                            "command\n",
+                            args[3]);
+                    break;
+                }
+            }
+            sort_key = unescape_str(args[1]);
+            value = unescape_str(args[2]);
+            fprintf(stderr,
+                    "LOAD: set sortkey \"%s\", value \"%s\", ttl %d\n",
+                    pegasus::utils::c_escape_string(sort_key, sc->escape_all).c_str(),
+                    pegasus::utils::c_escape_string(value, sc->escape_all).c_str(),
+                    ttl);
+            mutations.set(std::move(sort_key), std::move(value), ttl);
+            break;
+        case 2: // DEL
+            sort_key = unescape_str(args[1]);
+            fprintf(stderr,
+                    "LOAD: del sortkey \"%s\"\n",
+                    pegasus::utils::c_escape_string(sort_key, sc->escape_all).c_str());
+            mutations.del(std::move(sort_key));
+            break;
+        default:
+            fprintf(stderr, "ERROR: invalid mutation, print \"ok\" to finish loading\n");
+            break;
+        }
+    }
+    return 0;
+}
+
+inline bool check_and_mutate(command_executor *e, shell_context *sc, arguments args)
+{
+    if (args.argc < 2)
+        return false;
+
+    std::string hash_key = sds_to_string(args.argv[1]);
+    bool check_sort_key_provided = false;
+    std::string check_sort_key;
+    ::dsn::apps::cas_check_type::type check_type = ::dsn::apps::cas_check_type::CT_NO_CHECK;
+    std::string check_type_name;
+    bool check_operand_provided = false;
+    std::string check_operand;
+    pegasus::pegasus_client::mutations mutations;
+
+    pegasus::pegasus_client::check_and_mutate_options options;
+    static struct option long_options[] = {{"check_sort_key", required_argument, 0, 'c'},
+                                           {"check_type", required_argument, 0, 't'},
+                                           {"check_operand", required_argument, 0, 'o'},
+                                           {"return_check_value", no_argument, 0, 'r'},
+                                           {0, 0, 0, 0}};
+
+    escape_sds_argv(args.argc, args.argv);
+    std::string str;
+    optind = 0;
+    while (true) {
+        int option_index = 0;
+        int c;
+        c = getopt_long(args.argc, args.argv, "c:t:o:r", long_options, &option_index);
+        if (c == -1)
+            break;
+        switch (c) {
+        case 'c':
+            check_sort_key_provided = true;
+            check_sort_key = unescape_str(optarg);
+            break;
+        case 't':
+            check_type = type_from_string(::dsn::apps::_cas_check_type_VALUES_TO_NAMES,
+                                          std::string("ct_value_") + optarg,
+                                          ::dsn::apps::cas_check_type::CT_NO_CHECK);
+            if (check_type == ::dsn::apps::cas_check_type::CT_NO_CHECK) {
+                fprintf(stderr, "ERROR: invalid check_type param\n");
+                return false;
+            }
+            check_type_name = optarg;
+            break;
+        case 'o':
+            check_operand_provided = true;
+            check_operand = unescape_str(optarg);
+            break;
+        case 'r':
+            options.return_check_value = true;
+            break;
+        default:
+            return false;
+        }
+    }
+
+    if (!check_sort_key_provided) {
+        fprintf(stderr, "ERROR: check_sort_key not provided\n");
+        return false;
+    }
+    if (check_type == ::dsn::apps::cas_check_type::CT_NO_CHECK) {
+        fprintf(stderr, "ERROR: check_type not provided\n");
+        return false;
+    }
+    if (!check_operand_provided &&
+        check_type >= ::dsn::apps::cas_check_type::CT_VALUE_MATCH_ANYWHERE) {
+        fprintf(stderr, "ERROR: check_operand not provided\n");
+        return false;
+    }
+
+    fprintf(stderr,
+            "Load mutations, like\n"
+            "  set <sort_key> <value> [ttl]\n"
+            "  del <sort_key>\n"
+            "Print \"ok\" to finish loading, \"abort\" to abort this command\n");
+    if (load_mutations(sc, mutations)) {
+        fprintf(stderr, "INFO: abort check_and_mutate command\n");
+        return true;
+    }
+    if (mutations.is_empty()) {
+        fprintf(stderr, "ERROR: mutations not provided\n");
+        return false;
+    }
+
+    fprintf(stderr, "hash_key: \"%s\"\n", pegasus::utils::c_escape_string(hash_key).c_str());
+    fprintf(stderr,
+            "check_sort_key: \"%s\"\n",
+            pegasus::utils::c_escape_string(check_sort_key).c_str());
+    fprintf(stderr, "check_type: %s\n", check_type_name.c_str());
+    if (check_type >= ::dsn::apps::cas_check_type::CT_VALUE_MATCH_ANYWHERE) {
+        fprintf(stderr,
+                "check_operand: \"%s\"\n",
+                pegasus::utils::c_escape_string(check_operand).c_str());
+    }
+    fprintf(stderr, "return_check_value: %s\n", options.return_check_value ? "true" : "false");
+
+    std::vector<pegasus::pegasus_client::mutate> copy_of_mutations;
+    mutations.get_mutations(copy_of_mutations);
+    fprintf(stderr, "mutations:\n");
+    for (int i = 0; i < copy_of_mutations.size(); ++i) {
+        if (copy_of_mutations[i].operation ==
+            pegasus::pegasus_client::mutate::mutate_operation::MO_PUT) {
+            fprintf(stderr,
+                    "  mutation[%d].type: SET\n  mutation[%d].sort_key: \"%s\"\n  "
+                    "mutation[%d].value: "
+                    "\"%s\"\n  mutation[%d].expire_seconds: %d\n",
+                    i,
+                    i,
+                    pegasus::utils::c_escape_string(copy_of_mutations[i].sort_key).c_str(),
+                    i,
+                    pegasus::utils::c_escape_string(copy_of_mutations[i].value).c_str(),
+                    i,
+                    copy_of_mutations[i].set_expire_ts_seconds);
+        } else {
+            fprintf(stderr,
+                    "  mutation[%d].type: DEL\n  mutation[%d].sort_key: \"%s\"\n",
+                    i,
+                    i,
+                    pegasus::utils::c_escape_string(copy_of_mutations[i].sort_key).c_str());
+        }
+    }
+    fprintf(stderr, "\n");
+
+    pegasus::pegasus_client::check_and_mutate_results results;
+    pegasus::pegasus_client::internal_info info;
+    int ret = sc->pg_client->check_and_mutate(hash_key,
+                                              check_sort_key,
+                                              (pegasus::pegasus_client::cas_check_type)check_type,
+                                              check_operand,
+                                              mutations,
+                                              options,
+                                              results,
+                                              sc->timeout_ms,
+                                              &info);
+    if (ret != pegasus::PERR_OK) {
+        fprintf(stderr, "ERROR: %s\n", sc->pg_client->get_error_string(ret));
+    } else {
+        if (results.mutate_succeed) {
+            fprintf(stderr, "Mutate succeed.\n");
+        } else {
+            fprintf(stderr, "Mutate failed, because check not passed.\n");
+        }
+        if (results.check_value_returned) {
+            fprintf(stderr, "\n");
+            if (results.check_value_exist) {
+                fprintf(
+                    stderr,
+                    "Check value: \"%s\"\n",
+                    pegasus::utils::c_escape_string(results.check_value, sc->escape_all).c_str());
+            } else {
+                fprintf(stderr, "Check value not exist.\n");
+            }
+        }
+    }
+
+    fprintf(stderr, "\n");
+    fprintf(stderr, "app_id          : %d\n", info.app_id);
+    fprintf(stderr, "partition_index : %d\n", info.partition_index);
+    fprintf(stderr, "decree          : %ld\n", info.decree);
+    fprintf(stderr, "server          : %s\n", info.server.c_str());
+
+    return true;
+}
+
 inline bool get_ttl(command_executor *e, shell_context *sc, arguments args)
 {
     if (args.argc != 3) {
@@ -1316,6 +1742,7 @@ inline bool hash_scan(command_executor *e, shell_context *sc, arguments args)
     std::string start_sort_key = sds_to_string(args.argv[2]);
     std::string stop_sort_key = sds_to_string(args.argv[3]);
 
+    int32_t batch_size = 100;
     int32_t max_count = -1;
     bool detailed = false;
     FILE *file = stderr;
@@ -1324,6 +1751,7 @@ inline bool hash_scan(command_executor *e, shell_context *sc, arguments args)
     pegasus::pegasus_client::scan_options options;
 
     static struct option long_options[] = {{"detailed", no_argument, 0, 'd'},
+                                           {"batch_size", required_argument, 0, 'z'},
                                            {"max_count", required_argument, 0, 'n'},
                                            {"timeout_ms", required_argument, 0, 't'},
                                            {"output", required_argument, 0, 'o'},
@@ -1339,21 +1767,27 @@ inline bool hash_scan(command_executor *e, shell_context *sc, arguments args)
     while (true) {
         int option_index = 0;
         int c;
-        c = getopt_long(args.argc, args.argv, "dn:t:o:a:b:s:y:i", long_options, &option_index);
+        c = getopt_long(args.argc, args.argv, "dz:n:t:o:a:b:s:y:i", long_options, &option_index);
         if (c == -1)
             break;
         switch (c) {
         case 'd':
             detailed = true;
             break;
+        case 'z':
+            if (!dsn::buf2int32(optarg, batch_size)) {
+                fprintf(stderr, "parse %s as batch_size failed\n", optarg);
+                return false;
+            }
+            break;
         case 'n':
-            if (!::pegasus::utils::buf2int(optarg, strlen(optarg), max_count)) {
+            if (!dsn::buf2int32(optarg, max_count)) {
                 fprintf(stderr, "parse %s as max_count failed\n", optarg);
                 return false;
             }
             break;
         case 't':
-            if (!::pegasus::utils::buf2int(optarg, strlen(optarg), timeout_ms)) {
+            if (!dsn::buf2int32(optarg, timeout_ms)) {
                 fprintf(stderr, "parse %s as timeout_ms failed\n", optarg);
                 return false;
             }
@@ -1366,19 +1800,23 @@ inline bool hash_scan(command_executor *e, shell_context *sc, arguments args)
             }
             break;
         case 'a':
-            if (!::pegasus::utils::buf2bool(optarg, strlen(optarg), options.start_inclusive)) {
+            if (!dsn::buf2bool(optarg, options.start_inclusive)) {
                 fprintf(stderr, "invalid start_inclusive param\n");
                 return false;
             }
             break;
         case 'b':
-            if (!::pegasus::utils::buf2bool(optarg, strlen(optarg), options.stop_inclusive)) {
+            if (!dsn::buf2bool(optarg, options.stop_inclusive)) {
                 fprintf(stderr, "invalid stop_inclusive param\n");
                 return false;
             }
             break;
         case 's':
-            if (!buf2filter_type(optarg, strlen(optarg), options.sort_key_filter_type)) {
+            options.sort_key_filter_type = (pegasus::pegasus_client::filter_type)type_from_string(
+                ::dsn::apps::_filter_type_VALUES_TO_NAMES,
+                std::string("ft_match_") + optarg,
+                ::dsn::apps::filter_type::FT_NO_FILTER);
+            if (options.sort_key_filter_type == pegasus::pegasus_client::FT_NO_FILTER) {
                 fprintf(stderr, "invalid sort_key_filter_type param\n");
                 return false;
             }
@@ -1409,13 +1847,17 @@ inline bool hash_scan(command_executor *e, shell_context *sc, arguments args)
                 "sort_key_filter_pattern: \"%s\"\n",
                 pegasus::utils::c_escape_string(options.sort_key_filter_pattern).c_str());
     }
+    fprintf(stderr, "batch_size: %d\n", batch_size);
     fprintf(stderr, "max_count: %d\n", max_count);
+    fprintf(stderr, "timout_ms: %d\n", timeout_ms);
+    fprintf(stderr, "detailed: %s\n", detailed ? "true" : "false");
     fprintf(stderr, "no_value: %s\n", options.no_value ? "true" : "false");
     fprintf(stderr, "\n");
 
     int i = 0;
     pegasus::pegasus_client::pegasus_scanner *scanner = nullptr;
     options.timeout_ms = timeout_ms;
+    options.batch_size = batch_size;
     int ret = sc->pg_client->get_scanner(hash_key, start_sort_key, stop_sort_key, options, scanner);
     if (ret != pegasus::PERR_OK) {
         fprintf(file, "ERROR: get scanner failed: %s\n", sc->pg_client->get_error_string(ret));
@@ -1485,6 +1927,7 @@ inline bool hash_scan(command_executor *e, shell_context *sc, arguments args)
 inline bool full_scan(command_executor *e, shell_context *sc, arguments args)
 {
     static struct option long_options[] = {{"detailed", no_argument, 0, 'd'},
+                                           {"batch_size", required_argument, 0, 'z'},
                                            {"max_count", required_argument, 0, 'n'},
                                            {"partition", required_argument, 0, 'p'},
                                            {"timeout_ms", required_argument, 0, 't'},
@@ -1496,7 +1939,8 @@ inline bool full_scan(command_executor *e, shell_context *sc, arguments args)
                                            {"no_value", no_argument, 0, 'i'},
                                            {0, 0, 0, 0}};
 
-    int32_t max_count = 0x7FFFFFFF;
+    int32_t batch_size = 100;
+    int32_t max_count = -1;
     bool detailed = false;
     FILE *file = stderr;
     int32_t timeout_ms = sc->timeout_ms;
@@ -1510,21 +1954,27 @@ inline bool full_scan(command_executor *e, shell_context *sc, arguments args)
     while (true) {
         int option_index = 0;
         int c;
-        c = getopt_long(args.argc, args.argv, "dn:p:t:o:h:x:s:y:i", long_options, &option_index);
+        c = getopt_long(args.argc, args.argv, "dz:n:p:t:o:h:x:s:y:i", long_options, &option_index);
         if (c == -1)
             break;
         switch (c) {
         case 'd':
             detailed = true;
             break;
+        case 'z':
+            if (!dsn::buf2int32(optarg, batch_size)) {
+                fprintf(stderr, "parse %s as batch_size failed\n", optarg);
+                return false;
+            }
+            break;
         case 'n':
-            if (!::pegasus::utils::buf2int(optarg, strlen(optarg), max_count)) {
+            if (!dsn::buf2int32(optarg, max_count)) {
                 fprintf(stderr, "parse %s as max_count failed\n", optarg);
                 return false;
             }
             break;
         case 'p':
-            if (!::pegasus::utils::buf2int(optarg, strlen(optarg), partition)) {
+            if (!dsn::buf2int32(optarg, partition)) {
                 fprintf(stderr, "parse %s as partition id failed\n", optarg);
                 return false;
             }
@@ -1534,7 +1984,7 @@ inline bool full_scan(command_executor *e, shell_context *sc, arguments args)
             }
             break;
         case 't':
-            if (!::pegasus::utils::buf2int(optarg, strlen(optarg), timeout_ms)) {
+            if (!dsn::buf2int32(optarg, timeout_ms)) {
                 fprintf(stderr, "parse %s as timeout_ms failed\n", optarg);
                 return false;
             }
@@ -1547,7 +1997,11 @@ inline bool full_scan(command_executor *e, shell_context *sc, arguments args)
             }
             break;
         case 'h':
-            if (!buf2filter_type(optarg, strlen(optarg), options.hash_key_filter_type)) {
+            options.hash_key_filter_type = (pegasus::pegasus_client::filter_type)type_from_string(
+                ::dsn::apps::_filter_type_VALUES_TO_NAMES,
+                std::string("ft_match_") + optarg,
+                ::dsn::apps::filter_type::FT_NO_FILTER);
+            if (options.hash_key_filter_type == pegasus::pegasus_client::FT_NO_FILTER) {
                 fprintf(stderr, "invalid hash_key_filter_type param\n");
                 return false;
             }
@@ -1557,7 +2011,11 @@ inline bool full_scan(command_executor *e, shell_context *sc, arguments args)
             options.hash_key_filter_pattern = unescape_str(optarg);
             break;
         case 's':
-            if (!buf2filter_type(optarg, strlen(optarg), options.sort_key_filter_type)) {
+            options.sort_key_filter_type = (pegasus::pegasus_client::filter_type)type_from_string(
+                dsn::apps::_filter_type_VALUES_TO_NAMES,
+                std::string("ft_match_") + optarg,
+                ::dsn::apps::filter_type::FT_NO_FILTER);
+            if (options.sort_key_filter_type == pegasus::pegasus_client::FT_NO_FILTER) {
                 fprintf(stderr, "invalid sort_key_filter_type param\n");
                 return false;
             }
@@ -1589,13 +2047,17 @@ inline bool full_scan(command_executor *e, shell_context *sc, arguments args)
                 "sort_key_filter_pattern: \"%s\"\n",
                 pegasus::utils::c_escape_string(options.sort_key_filter_pattern).c_str());
     }
+    fprintf(stderr, "batch_size: %d\n", batch_size);
     fprintf(stderr, "max_count: %d\n", max_count);
+    fprintf(stderr, "timout_ms: %d\n", timeout_ms);
+    fprintf(stderr, "detailed: %s\n", detailed ? "true" : "false");
     fprintf(stderr, "no_value: %s\n", options.no_value ? "true" : "false");
     fprintf(stderr, "\n");
 
     int i = 0;
     std::vector<pegasus::pegasus_client::pegasus_scanner *> scanners;
     options.timeout_ms = timeout_ms;
+    options.batch_size = batch_size;
     int ret = sc->pg_client->get_unordered_scanners(10000, options, scanners);
     if (ret != pegasus::PERR_OK) {
         fprintf(file, "ERROR: %s\n", sc->pg_client->get_error_string(ret));
@@ -1684,19 +2146,22 @@ inline bool copy_data(command_executor *e, shell_context *sc, arguments args)
                                            {"max_split_count", required_argument, 0, 's'},
                                            {"max_batch_count", required_argument, 0, 'b'},
                                            {"timeout_ms", required_argument, 0, 't'},
+                                           {"geo_data", no_argument, 0, 'g'},
                                            {0, 0, 0, 0}};
 
     std::string target_cluster_name;
     std::string target_app_name;
+    std::string target_geo_app_name;
     int max_split_count = 100000000;
     int max_batch_count = 500;
     int timeout_ms = sc->timeout_ms;
+    bool is_geo_data = false;
 
     optind = 0;
     while (true) {
         int option_index = 0;
         int c;
-        c = getopt_long(args.argc, args.argv, "c:a:s:b:t:", long_options, &option_index);
+        c = getopt_long(args.argc, args.argv, "c:a:s:b:t:g", long_options, &option_index);
         if (c == -1)
             break;
         switch (c) {
@@ -1705,24 +2170,28 @@ inline bool copy_data(command_executor *e, shell_context *sc, arguments args)
             break;
         case 'a':
             target_app_name = optarg;
+            target_geo_app_name = target_app_name + "_geo";
             break;
         case 's':
-            if (!::pegasus::utils::buf2int(optarg, strlen(optarg), max_split_count)) {
+            if (!dsn::buf2int32(optarg, max_split_count)) {
                 fprintf(stderr, "parse %s as max_split_count failed\n", optarg);
                 return false;
             }
             break;
         case 'b':
-            if (!::pegasus::utils::buf2int(optarg, strlen(optarg), max_batch_count)) {
+            if (!dsn::buf2int32(optarg, max_batch_count)) {
                 fprintf(stderr, "parse %s as max_batch_count failed\n", optarg);
                 return false;
             }
             break;
         case 't':
-            if (!::pegasus::utils::buf2int(optarg, strlen(optarg), timeout_ms)) {
+            if (!dsn::buf2int32(optarg, timeout_ms)) {
                 fprintf(stderr, "parse %s as timeout_ms failed\n", optarg);
                 return false;
             }
+            break;
+        case 'g':
+            is_geo_data = true;
             break;
         default:
             return false;
@@ -1758,6 +2227,9 @@ inline bool copy_data(command_executor *e, shell_context *sc, arguments args)
     fprintf(stderr, "INFO: source_app_name = %s\n", sc->pg_client->get_app_name());
     fprintf(stderr, "INFO: target_cluster_name = %s\n", target_cluster_name.c_str());
     fprintf(stderr, "INFO: target_app_name = %s\n", target_app_name.c_str());
+    if (is_geo_data) {
+        fprintf(stderr, "INFO: target_geo_app_name = %s\n", target_geo_app_name.c_str());
+    }
     fprintf(stderr, "INFO: max_split_count = %d\n", max_split_count);
     fprintf(stderr, "INFO: max_batch_count = %d\n", max_batch_count);
     fprintf(stderr, "INFO: timeout_ms = %d\n", timeout_ms);
@@ -1770,7 +2242,7 @@ inline bool copy_data(command_executor *e, shell_context *sc, arguments args)
 
     pegasus::pegasus_client *target_client = pegasus::pegasus_client_factory::get_client(
         target_cluster_name.c_str(), target_app_name.c_str());
-    if (target_client == NULL) {
+    if (target_client == nullptr) {
         fprintf(stderr, "ERROR: get target app client failed\n");
         return true;
     }
@@ -1782,6 +2254,16 @@ inline bool copy_data(command_executor *e, shell_context *sc, arguments args)
         return true;
     }
 
+    pegasus::geo::geo_client *target_geo_client = nullptr;
+    if (is_geo_data) {
+        target_geo_client =
+            new pegasus::geo::geo_client("config.ini",
+                                         target_cluster_name.c_str(),
+                                         target_app_name.c_str(),
+                                         target_geo_app_name.c_str(),
+                                         new pegasus::geo::latlng_extractor_for_lbs());
+    }
+
     std::vector<pegasus::pegasus_client::pegasus_scanner *> scanners;
     pegasus::pegasus_client::scan_options options;
     options.timeout_ms = timeout_ms;
@@ -1790,6 +2272,7 @@ inline bool copy_data(command_executor *e, shell_context *sc, arguments args)
         fprintf(stderr,
                 "ERROR: open source app scanner failed: %s\n",
                 sc->pg_client->get_error_string(ret));
+        delete target_geo_client;
         return true;
     }
     int split_count = scanners.size();
@@ -1798,12 +2281,13 @@ inline bool copy_data(command_executor *e, shell_context *sc, arguments args)
     std::atomic_bool error_occurred(false);
     std::vector<scan_data_context *> contexts;
     for (int i = 0; i < scanners.size(); i++) {
-        scan_data_context *context = new scan_data_context(SCAN_COPY,
+        scan_data_context *context = new scan_data_context(is_geo_data ? SCAN_GEN_GEO : SCAN_COPY,
                                                            i,
                                                            max_batch_count,
                                                            timeout_ms,
                                                            scanners[i]->get_smart_wrapper(),
                                                            target_client,
+                                                           target_geo_client,
                                                            &error_occurred);
         contexts.push_back(context);
         dsn::tasking::enqueue(LPC_SCAN_DATA, nullptr, std::bind(scan_data_next, context));
@@ -1860,6 +2344,7 @@ inline bool copy_data(command_executor *e, shell_context *sc, arguments args)
         delete contexts[i];
     }
     contexts.clear();
+    delete target_geo_client;
 
     fprintf(stderr,
             "\nCopy %s, total %ld rows.\n",
@@ -1894,19 +2379,19 @@ inline bool clear_data(command_executor *e, shell_context *sc, arguments args)
             force = true;
             break;
         case 's':
-            if (!::pegasus::utils::buf2int(optarg, strlen(optarg), max_split_count)) {
+            if (!dsn::buf2int32(optarg, max_split_count)) {
                 fprintf(stderr, "parse %s as max_split_count failed\n", optarg);
                 return false;
             }
             break;
         case 'b':
-            if (!::pegasus::utils::buf2int(optarg, strlen(optarg), max_batch_count)) {
+            if (!dsn::buf2int32(optarg, max_batch_count)) {
                 fprintf(stderr, "parse %s as max_batch_count failed\n", optarg);
                 return false;
             }
             break;
         case 't':
-            if (!::pegasus::utils::buf2int(optarg, strlen(optarg), timeout_ms)) {
+            if (!dsn::buf2int32(optarg, timeout_ms)) {
                 fprintf(stderr, "parse %s as timeout_ms failed\n", optarg);
                 return false;
             }
@@ -1966,6 +2451,7 @@ inline bool clear_data(command_executor *e, shell_context *sc, arguments args)
                                                            timeout_ms,
                                                            scanners[i]->get_smart_wrapper(),
                                                            sc->pg_client,
+                                                           nullptr,
                                                            &error_occurred);
         contexts.push_back(context);
         dsn::tasking::enqueue(LPC_SCAN_DATA, nullptr, std::bind(scan_data_next, context));
@@ -2056,19 +2542,19 @@ inline bool count_data(command_executor *e, shell_context *sc, arguments args)
             break;
         switch (c) {
         case 's':
-            if (!::pegasus::utils::buf2int(optarg, strlen(optarg), max_split_count)) {
+            if (!dsn::buf2int32(optarg, max_split_count)) {
                 fprintf(stderr, "parse %s as max_split_count failed\n", optarg);
                 return false;
             }
             break;
         case 'b':
-            if (!::pegasus::utils::buf2int(optarg, strlen(optarg), max_batch_count)) {
+            if (!dsn::buf2int32(optarg, max_batch_count)) {
                 fprintf(stderr, "parse %s as max_batch_count failed\n", optarg);
                 return false;
             }
             break;
         case 't':
-            if (!::pegasus::utils::buf2int(optarg, strlen(optarg), timeout_ms)) {
+            if (!dsn::buf2int32(optarg, timeout_ms)) {
                 fprintf(stderr, "parse %s as timeout_ms failed\n", optarg);
                 return false;
             }
@@ -2077,13 +2563,13 @@ inline bool count_data(command_executor *e, shell_context *sc, arguments args)
             stat_size = true;
             break;
         case 'c':
-            if (!::pegasus::utils::buf2int(optarg, strlen(optarg), top_count)) {
+            if (!dsn::buf2int32(optarg, top_count)) {
                 fprintf(stderr, "parse %s as top_count failed\n", optarg);
                 return false;
             }
             break;
         case 'r':
-            if (!::pegasus::utils::buf2int(optarg, strlen(optarg), run_seconds)) {
+            if (!dsn::buf2int32(optarg, run_seconds)) {
                 fprintf(stderr, "parse %s as run_seconds failed\n", optarg);
                 return false;
             }
@@ -2149,6 +2635,7 @@ inline bool count_data(command_executor *e, shell_context *sc, arguments args)
                                                            timeout_ms,
                                                            scanners[i]->get_smart_wrapper(),
                                                            sc->pg_client,
+                                                           nullptr,
                                                            &error_occurred,
                                                            stat_size,
                                                            top_count);
@@ -2349,6 +2836,9 @@ inline bool data_operations(command_executor *e, shell_context *sc, arguments ar
         {"del", delete_value},
         {"multi_del", multi_del_value},
         {"multi_del_range", multi_del_range},
+        {"incr", incr},
+        {"check_and_set", check_and_set},
+        {"check_and_mutate", check_and_mutate},
         {"exist", exist},
         {"count", sortkey_count},
         {"ttl", get_ttl},
@@ -2432,7 +2922,6 @@ inline bool sst_dump(command_executor *e, shell_context *sc, arguments args)
 }
 
 static const char *INDENT = "  ";
-DEFINE_TASK_CODE_RPC(RPC_RRDB_RRDB_INCR, TASK_PRIORITY_COMMON, ::dsn::THREAD_POOL_DEFAULT)
 inline bool mlog_dump(command_executor *e, shell_context *sc, arguments args)
 {
     static struct option long_options[] = {{"detailed", no_argument, 0, 'd'},
@@ -2486,13 +2975,13 @@ inline bool mlog_dump(command_executor *e, shell_context *sc, arguments args)
     }
     std::ostream &os = *os_ptr;
 
-    std::function<void(int64_t decree, int64_t timestamp, dsn_message_t * requests, int count)>
+    std::function<void(int64_t decree, int64_t timestamp, dsn::message_ex * *requests, int count)>
         callback;
     if (detailed) {
         callback = [&os, sc](
-            int64_t decree, int64_t timestamp, dsn_message_t *requests, int count) mutable {
+            int64_t decree, int64_t timestamp, dsn::message_ex **requests, int count) mutable {
             for (int i = 0; i < count; ++i) {
-                dsn_message_t request = requests[i];
+                dsn::message_ex *request = requests[i];
                 dassert(request != nullptr, "");
                 ::dsn::message_ex *msg = (::dsn::message_ex *)request;
                 if (msg->local_rpc_code == RPC_REPLICATION_WRITE_EMPTY) {
@@ -2539,7 +3028,7 @@ inline bool mlog_dump(command_executor *e, shell_context *sc, arguments args)
                            << "\" : \"" << pegasus::utils::c_escape_string(sort_key, sc->escape_all)
                            << "\"" << std::endl;
                     }
-                } else if (msg->local_rpc_code == RPC_RRDB_RRDB_INCR) {
+                } else if (msg->local_rpc_code == ::dsn::apps::RPC_RRDB_RRDB_INCR) {
                     ::dsn::apps::incr_request update;
                     ::dsn::unmarshall(request, update);
                     std::string hash_key, sort_key;
@@ -2603,7 +3092,7 @@ inline bool recover(command_executor *e, shell_context *sc, arguments args)
             node_list_str = optarg;
             break;
         case 'w':
-            if (!::pegasus::utils::buf2int(optarg, strlen(optarg), wait_seconds)) {
+            if (!dsn::buf2int32(optarg, wait_seconds)) {
                 fprintf(stderr, "parse %s as wait_seconds failed\n", optarg);
                 return false;
             }
@@ -2916,9 +3405,9 @@ inline bool app_disk(command_executor *e, shell_context *sc, arguments args)
                       << " failed" << std::endl;
             return true;
         }
-        pegasus::perf_counter_info info;
+        dsn::perf_counter_info info;
         dsn::blob bb(results[i].second.data(), 0, results[i].second.size());
-        if (!dsn::json::json_forwarder<pegasus::perf_counter_info>::decode(bb, info)) {
+        if (!dsn::json::json_forwarder<dsn::perf_counter_info>::decode(bb, info)) {
             std::cout << "ERROR: decode perf counter info from node "
                       << nodes[i].address.to_string() << " failed, result = " << results[i].second
                       << std::endl;
@@ -2929,7 +3418,7 @@ inline bool app_disk(command_executor *e, shell_context *sc, arguments args)
                       << " returns error, error = " << info.result << std::endl;
             return true;
         }
-        for (pegasus::perf_counter_metric &m : info.counters) {
+        for (dsn::perf_counter_metric &m : info.counters) {
             int32_t app_id_x, partition_index_x;
             std::string counter_name;
             bool parse_ret = parse_app_pegasus_perf_counter_name(
@@ -3103,22 +3592,27 @@ inline bool app_disk(command_executor *e, shell_context *sc, arguments args)
 inline bool app_stat(command_executor *e, shell_context *sc, arguments args)
 {
     static struct option long_options[] = {{"app_name", required_argument, 0, 'a'},
+                                           {"only_qps", required_argument, 0, 'q'},
                                            {"output", required_argument, 0, 'o'},
                                            {0, 0, 0, 0}};
 
     std::string app_name;
     std::string out_file;
+    bool only_qps = false;
 
     optind = 0;
     while (true) {
         int option_index = 0;
         int c;
-        c = getopt_long(args.argc, args.argv, "a:o:", long_options, &option_index);
+        c = getopt_long(args.argc, args.argv, "a:qo:", long_options, &option_index);
         if (c == -1)
             break;
         switch (c) {
         case 'a':
             app_name = optarg;
+            break;
+        case 'q':
+            only_qps = true;
             break;
         case 'o':
             out_file = optarg;
@@ -3144,7 +3638,7 @@ inline bool app_stat(command_executor *e, shell_context *sc, arguments args)
     }
     std::ostream out(buf);
 
-    size_t w = 12;
+    size_t w = 10;
     size_t first_column_width = w;
     if (app_name.empty()) {
         for (row_data &row : rows) {
@@ -3154,13 +3648,17 @@ inline bool app_stat(command_executor *e, shell_context *sc, arguments args)
     } else {
         out << std::setw(first_column_width) << std::left << "pidx";
     }
-    out << std::setw(w) << std::right << "GET" << std::setw(w) << std::right << "MULTI_GET"
-        << std::setw(w) << std::right << "PUT" << std::setw(w) << std::right << "MULTI_PUT"
-        << std::setw(w) << std::right << "DEL" << std::setw(w) << std::right << "MULTI_DEL"
-        << std::setw(w) << std::right << "SCAN" << std::setw(w) << std::right << "expired"
-        << std::setw(w) << std::right << "filtered" << std::setw(w) << std::right << "abnormal"
-        << std::setw(w) << std::right << "storage_mb" << std::setw(w) << std::right << "file_count"
-        << std::endl;
+    out << std::setw(w) << std::right << "GET" << std::setw(w) << std::right << "MGET"
+        << std::setw(w) << std::right << "PUT" << std::setw(w) << std::right << "MPUT"
+        << std::setw(w) << std::right << "DEL" << std::setw(w) << std::right << "MDEL"
+        << std::setw(w) << std::right << "INCR" << std::setw(w) << std::right << "CAS"
+        << std::setw(w) << std::right << "CAM" << std::setw(w) << std::right << "SCAN";
+    if (!only_qps) {
+        out << std::setw(w) << std::right << "expired" << std::setw(w) << std::right << "filtered"
+            << std::setw(w) << std::right << "abnormal" << std::setw(w) << std::right << "file_mb"
+            << std::setw(w) << std::right << "file_num";
+    }
+    out << std::endl;
     rows.resize(rows.size() + 1);
     row_data &sum = rows.back();
     for (int i = 0; i < rows.size() - 1; ++i) {
@@ -3171,6 +3669,9 @@ inline bool app_stat(command_executor *e, shell_context *sc, arguments args)
         sum.multi_put_qps += row.multi_put_qps;
         sum.remove_qps += row.remove_qps;
         sum.multi_remove_qps += row.multi_remove_qps;
+        sum.incr_qps += row.incr_qps;
+        sum.check_and_set_qps += row.check_and_set_qps;
+        sum.check_and_mutate_qps += row.check_and_mutate_qps;
         sum.scan_qps += row.scan_qps;
         sum.recent_expire_count += row.recent_expire_count;
         sum.recent_filter_count += row.recent_filter_count;
@@ -3194,12 +3695,18 @@ inline bool app_stat(command_executor *e, shell_context *sc, arguments args)
         PRINT_QPS(multi_put_qps);
         PRINT_QPS(remove_qps);
         PRINT_QPS(multi_remove_qps);
+        PRINT_QPS(incr_qps);
+        PRINT_QPS(check_and_set_qps);
+        PRINT_QPS(check_and_mutate_qps);
         PRINT_QPS(scan_qps);
-        out << std::setw(w) << std::right << (int64_t)row.recent_expire_count << std::setw(w)
-            << std::right << (int64_t)row.recent_filter_count << std::setw(w) << std::right
-            << (int64_t)row.recent_abnormal_count << std::setw(w) << std::right
-            << (int64_t)row.storage_mb << std::setw(w) << std::right << (int64_t)row.storage_count
-            << std::endl;
+        if (!only_qps) {
+            out << std::setw(w) << std::right << (int64_t)row.recent_expire_count << std::setw(w)
+                << std::right << (int64_t)row.recent_filter_count << std::setw(w) << std::right
+                << (int64_t)row.recent_abnormal_count << std::setw(w) << std::right
+                << (int64_t)row.storage_mb << std::setw(w) << std::right
+                << (int64_t)row.storage_count;
+        }
+        out << std::endl;
     }
 #undef PRINT_QPS
 
@@ -3821,5 +4328,235 @@ inline bool app_partition_split(command_executor *e, shell_context *sc, argument
         std::cout << "split app " << app_name << " succeed" << std::endl;
     else
         std::cout << "split app " << app_name << " failed, error=" << err.to_string() << std::endl;
+
+    return true;
+}
+
+inline dsn::rpc_address diagnose_recommend(const ddd_partition_info &pinfo)
+{
+    if (pinfo.config.last_drops.size() < 2)
+        return dsn::rpc_address();
+
+    std::vector<dsn::rpc_address> last_two_nodes(pinfo.config.last_drops.end() - 2,
+                                                 pinfo.config.last_drops.end());
+    std::vector<ddd_node_info> last_dropped;
+    for (auto &node : last_two_nodes) {
+        auto it = std::find_if(pinfo.dropped.begin(),
+                               pinfo.dropped.end(),
+                               [&node](const ddd_node_info &r) { return r.node == node; });
+        if (it->is_alive && it->is_collected)
+            last_dropped.push_back(*it);
+    }
+
+    if (last_dropped.size() == 1) {
+        const ddd_node_info &ninfo = last_dropped.back();
+        if (ninfo.last_committed_decree >= pinfo.config.last_committed_decree)
+            return ninfo.node;
+    } else if (last_dropped.size() == 2) {
+        const ddd_node_info &secondary = last_dropped.front();
+        const ddd_node_info &latest = last_dropped.back();
+
+        // Select a best node to be the new primary, following the rule:
+        //  - choose the node with the largest last committed decree
+        //  - if last committed decree is the same, choose node with the largest ballot
+
+        if (latest.last_committed_decree == secondary.last_committed_decree &&
+            latest.last_committed_decree >= pinfo.config.last_committed_decree)
+            return latest.ballot >= secondary.ballot ? latest.node : secondary.node;
+
+        if (latest.last_committed_decree > secondary.last_committed_decree &&
+            latest.last_committed_decree >= pinfo.config.last_committed_decree)
+            return latest.node;
+
+        if (secondary.last_committed_decree > latest.last_committed_decree &&
+            secondary.last_committed_decree >= pinfo.config.last_committed_decree)
+            return secondary.node;
+    }
+
+    return dsn::rpc_address();
+}
+
+inline bool ddd_diagnose(command_executor *e, shell_context *sc, arguments args)
+{
+    static struct option long_options[] = {{"gpid", required_argument, 0, 'g'},
+                                           {"diagnose", no_argument, 0, 'd'},
+                                           {"auto_diagnose", no_argument, 0, 'a'},
+                                           {"skip_prompt", no_argument, 0, 's'},
+                                           {"output", required_argument, 0, 'o'},
+                                           {0, 0, 0, 0}};
+
+    std::string out_file;
+    dsn::gpid id(-1, -1);
+    bool diagnose = false;
+    bool auto_diagnose = false;
+    bool skip_prompt = false;
+    optind = 0;
+    while (true) {
+        int option_index = 0;
+        int c;
+        c = getopt_long(args.argc, args.argv, "g:daso:", long_options, &option_index);
+        if (c == -1)
+            break;
+        switch (c) {
+        case 'g':
+            int pid;
+            if (id.parse_from(optarg)) {
+                // app_id.partition_index
+            } else if (sscanf(optarg, "%d", &pid) == 1) {
+                // app_id
+                id.set_app_id(pid);
+            } else {
+                fprintf(stderr, "ERROR: invalid gpid %s\n", optarg);
+                return false;
+            }
+            break;
+        case 'd':
+            diagnose = true;
+            break;
+        case 'a':
+            auto_diagnose = true;
+            break;
+        case 's':
+            skip_prompt = true;
+            break;
+        case 'o':
+            out_file = optarg;
+            break;
+        default:
+            return false;
+        }
+    }
+
+    std::vector<ddd_partition_info> ddd_partitions;
+    ::dsn::error_code ret = sc->ddl_client->ddd_diagnose(id, ddd_partitions);
+    if (ret != dsn::ERR_OK) {
+        fprintf(stderr, "ERROR: DDD diagnose failed with err = %s\n", ret.to_string());
+        return true;
+    }
+
+    std::streambuf *buf;
+    std::ofstream of;
+
+    if (!out_file.empty()) {
+        of.open(out_file);
+        buf = of.rdbuf();
+    } else {
+        buf = std::cout.rdbuf();
+    }
+    std::ostream out(buf);
+
+    out << "Total " << ddd_partitions.size() << " ddd partitions:" << std::endl;
+    out << std::endl;
+    int proposed_count = 0;
+    int i = 0;
+    for (const ddd_partition_info &pinfo : ddd_partitions) {
+        out << "(" << ++i << ") " << pinfo.config.pid.to_string() << std::endl;
+        out << "    config: ballot(" << pinfo.config.ballot << "), "
+            << "last_committed(" << pinfo.config.last_committed_decree << ")" << std::endl;
+        out << "    ----" << std::endl;
+        dsn::rpc_address latest_dropped, secondary_latest_dropped;
+        if (pinfo.config.last_drops.size() > 0)
+            latest_dropped = pinfo.config.last_drops[pinfo.config.last_drops.size() - 1];
+        if (pinfo.config.last_drops.size() > 1)
+            secondary_latest_dropped = pinfo.config.last_drops[pinfo.config.last_drops.size() - 2];
+        int j = 0;
+        for (const ddd_node_info &n : pinfo.dropped) {
+            char time_buf[30];
+            ::dsn::utils::time_ms_to_string(n.drop_time_ms, time_buf);
+            out << "    dropped[" << j++ << "]: "
+                << "node(" << n.node.to_string() << "), "
+                << "drop_time(" << time_buf << "), "
+                << "alive(" << (n.is_alive ? "true" : "false") << "), "
+                << "collected(" << (n.is_collected ? "true" : "false") << "), "
+                << "ballot(" << n.ballot << "), "
+                << "last_committed(" << n.last_committed_decree << "), "
+                << "last_prepared(" << n.last_prepared_decree << ")";
+            if (n.node == latest_dropped)
+                out << "  <== the latest";
+            else if (n.node == secondary_latest_dropped)
+                out << "  <== the secondary latest";
+            out << std::endl;
+        }
+        out << "    ----" << std::endl;
+        j = 0;
+        for (const ::dsn::rpc_address &r : pinfo.config.last_drops) {
+            out << "    last_drops[" << j++ << "]: "
+                << "node(" << r.to_string() << ")";
+            if (j == (int)pinfo.config.last_drops.size() - 1)
+                out << "  <== the secondary latest";
+            else if (j == (int)pinfo.config.last_drops.size())
+                out << "  <== the latest";
+            out << std::endl;
+        }
+        out << "    ----" << std::endl;
+        out << "    ddd_reason: " << pinfo.reason << std::endl;
+        if (diagnose) {
+            out << "    ----" << std::endl;
+
+            dsn::rpc_address primary = diagnose_recommend(pinfo);
+            out << "    recommend_primary: "
+                << (primary.is_invalid() ? "none" : primary.to_string());
+            if (primary == latest_dropped)
+                out << "  <== the latest";
+            else if (primary == secondary_latest_dropped)
+                out << "  <== the secondary latest";
+            out << std::endl;
+
+            bool skip_this = false;
+            if (!primary.is_invalid() && !auto_diagnose && !skip_prompt) {
+                do {
+                    std::cout << "    > Are you sure to use the recommend primary? [y/n/s(skip)]: ";
+                    char c;
+                    std::cin >> c;
+                    if (c == 'y') {
+                        break;
+                    } else if (c == 'n') {
+                        primary.set_invalid();
+                        break;
+                    } else if (c == 's') {
+                        skip_this = true;
+                        std::cout << "    > You have choosed to skip diagnosing this partition."
+                                  << std::endl;
+                        break;
+                    }
+                } while (true);
+            }
+
+            if (primary.is_invalid() && !skip_prompt && !skip_this) {
+                do {
+                    std::cout << "    > Please input the primary node: ";
+                    std::string addr;
+                    std::cin >> addr;
+                    if (primary.from_string_ipv4(addr.c_str())) {
+                        break;
+                    } else {
+                        std::cout << "    > Sorry, you have input an invalid node address."
+                                  << std::endl;
+                    }
+                } while (true);
+            }
+
+            if (!primary.is_invalid() && !skip_this) {
+                dsn::replication::configuration_balancer_request request;
+                request.gpid = pinfo.config.pid;
+                request.action_list = {configuration_proposal_action{
+                    primary, primary, config_type::CT_ASSIGN_PRIMARY}};
+                request.force = false;
+                dsn::error_code err = sc->ddl_client->send_balancer_proposal(request);
+                out << "    propose_request: propose -g " << request.gpid.to_string()
+                    << " -p ASSIGN_PRIMARY -t " << primary.to_string() << " -n "
+                    << primary.to_string() << std::endl;
+                out << "    propose_response: " << err.to_string() << std::endl;
+                proposed_count++;
+            } else {
+                out << "    propose_request: none" << std::endl;
+            }
+        }
+        out << std::endl;
+        out << "Proposed count: " << proposed_count << "/" << ddd_partitions.size() << std::endl;
+        out << std::endl;
+    }
+
+    std::cout << "Diagnose ddd done." << std::endl;
     return true;
 }

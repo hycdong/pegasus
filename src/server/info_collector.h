@@ -7,7 +7,7 @@
 #include <dsn/tool-api/task_tracker.h>
 #include <dsn/dist/replication.h>
 #include <dsn/dist/replication/replication_other_types.h>
-#include <dsn/cpp/perf_counter_wrapper.h>
+#include <dsn/perf_counter/perf_counter_wrapper.h>
 
 #include <stdlib.h>
 #include <signal.h>
@@ -34,6 +34,9 @@ public:
         ::dsn::perf_counter_wrapper multi_put_qps;
         ::dsn::perf_counter_wrapper remove_qps;
         ::dsn::perf_counter_wrapper multi_remove_qps;
+        ::dsn::perf_counter_wrapper incr_qps;
+        ::dsn::perf_counter_wrapper check_and_set_qps;
+        ::dsn::perf_counter_wrapper check_and_mutate_qps;
         ::dsn::perf_counter_wrapper scan_qps;
         ::dsn::perf_counter_wrapper recent_expire_count;
         ::dsn::perf_counter_wrapper recent_filter_count;
@@ -64,5 +67,5 @@ private:
     ::dsn::utils::ex_lock_nr _app_stat_counter_lock;
     std::map<std::string, AppStatCounters *> _app_stat_counters;
 };
-}
-} // namespace
+} // namespace server
+} // namespace pegasus

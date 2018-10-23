@@ -99,12 +99,137 @@ public:
         }
     };
 
+    enum cas_check_type
+    {
+        CT_NO_CHECK = 0,
+
+        // appearance
+        CT_VALUE_NOT_EXIST = 1,          // value is not exist
+        CT_VALUE_NOT_EXIST_OR_EMPTY = 2, // value is not exist or value is empty
+        CT_VALUE_EXIST = 3,              // value is exist
+        CT_VALUE_NOT_EMPTY = 4,          // value is exist and not empty
+
+        // match
+        CT_VALUE_MATCH_ANYWHERE = 5, // operand matches anywhere in value
+        CT_VALUE_MATCH_PREFIX = 6,   // operand matches prefix in value
+        CT_VALUE_MATCH_POSTFIX = 7,  // operand matches postfix in value
+
+        // bytes compare
+        CT_VALUE_BYTES_LESS = 8,              // bytes compare: value < operand
+        CT_VALUE_BYTES_LESS_OR_EQUAL = 9,     // bytes compare: value <= operand
+        CT_VALUE_BYTES_EQUAL = 10,            // bytes compare: value == operand
+        CT_VALUE_BYTES_GREATER_OR_EQUAL = 11, // bytes compare: value >= operand
+        CT_VALUE_BYTES_GREATER = 12,          // bytes compare: value > operand
+
+        // int compare: first transfer bytes to int64 by atoi(); then compare by int value
+        CT_VALUE_INT_LESS = 13,             // int compare: value < operand
+        CT_VALUE_INT_LESS_OR_EQUAL = 14,    // int compare: value <= operand
+        CT_VALUE_INT_EQUAL = 15,            // int compare: value == operand
+        CT_VALUE_INT_GREATER_OR_EQUAL = 16, // int compare: value >= operand
+        CT_VALUE_INT_GREATER = 17           // int compare: value > operand
+    };
+
+    struct check_and_set_options
+    {
+        int set_value_ttl_seconds; // time to live in seconds of the set value, 0 means no ttl.
+        bool return_check_value;   // if return the check value in results.
+        check_and_set_options() : set_value_ttl_seconds(0), return_check_value(false) {}
+        check_and_set_options(const check_and_set_options &o)
+            : set_value_ttl_seconds(o.set_value_ttl_seconds),
+              return_check_value(o.return_check_value)
+        {
+        }
+    };
+
+    struct check_and_set_results
+    {
+        bool set_succeed;          // if set value succeed.
+        bool check_value_returned; // if the check value is returned.
+        bool check_value_exist;    // can be used only when check_value_returned is true.
+        std::string check_value;   // can be used only when check_value_exist is true.
+        check_and_set_results()
+            : set_succeed(false), check_value_returned(false), check_value_exist(false)
+        {
+        }
+        check_and_set_results(const check_and_set_results &o)
+            : set_succeed(o.set_succeed),
+              check_value_returned(o.check_value_returned),
+              check_value_exist(o.check_value_exist)
+        {
+        }
+    };
+
+    struct mutate
+    {
+        enum mutate_operation
+        {
+            MO_PUT = 0,
+            MO_DELETE = 1
+        };
+        mutate_operation operation;
+        std::string sort_key;
+        std::string value;
+        int set_expire_ts_seconds; // 0 means no ttl
+        mutate() : operation(MO_PUT), set_expire_ts_seconds(0) {}
+        mutate(const mutate &o)
+            : operation(o.operation),
+              sort_key(o.sort_key),
+              value(o.value),
+              set_expire_ts_seconds(o.set_expire_ts_seconds)
+        {
+        }
+    };
+
+    struct mutations
+    {
+    private:
+        std::vector<mutate> mu_list;
+        std::vector<std::pair<int, int>> ttl_list; // pair<index in mu_list, ttl_seconds>
+
+    public:
+        void set(const std::string &sort_key, const std::string &value, const int ttl_seconds = 0);
+        void set(std::string &&sort_key, std::string &&value, const int ttl_seconds = 0);
+        void del(const std::string &sort_key);
+        void del(std::string &&sort_key);
+        void get_mutations(std::vector<mutate> &mutations) const;
+
+        bool is_empty() const { return mu_list.empty(); }
+    };
+
+    struct check_and_mutate_options
+    {
+        bool return_check_value; // if return the check value in results.
+        check_and_mutate_options() : return_check_value(false) {}
+        check_and_mutate_options(const check_and_mutate_options &o)
+            : return_check_value(o.return_check_value)
+        {
+        }
+    };
+
+    struct check_and_mutate_results
+    {
+        bool mutate_succeed;       // if mutate succeed.
+        bool check_value_returned; // if the check value is returned.
+        bool check_value_exist;    // can be used only when check_value_returned is true.
+        std::string check_value;   // can be used only when check_value_exist is true.
+        check_and_mutate_results()
+            : mutate_succeed(false), check_value_returned(false), check_value_exist(false)
+        {
+        }
+        check_and_mutate_results(const check_and_mutate_results &o)
+            : mutate_succeed(o.mutate_succeed),
+              check_value_returned(o.check_value_returned),
+              check_value_exist(o.check_value_exist)
+        {
+        }
+    };
+
     struct scan_options
     {
-        int timeout_ms;           // RPC call timeout param, in milliseconds
-        int batch_size;           // max k-v count one RPC call
-        bool start_inclusive;     // will be ingored when get_unordered_scanners()
-        bool stop_inclusive;      // will be ingored when get_unordered_scanners()
+        int timeout_ms;       // RPC call timeout param, in milliseconds
+        int batch_size;       // max k-v count one RPC call
+        bool start_inclusive; // will be ingored when get_unordered_scanners()
+        bool stop_inclusive;  // will be ingored when get_unordered_scanners()
         filter_type hash_key_filter_type;
         std::string hash_key_filter_pattern;
         filter_type sort_key_filter_type;
@@ -112,7 +237,7 @@ public:
         bool no_value; // only fetch hash_key and sort_key, but not fetch value
         scan_options()
             : timeout_ms(5000),
-              batch_size(1000),
+              batch_size(100),
               start_inclusive(true),
               stop_inclusive(false),
               hash_key_filter_type(FT_NO_FILTER),
@@ -154,6 +279,15 @@ public:
     typedef std::function<void(
         int /*error_code*/, int64_t /*deleted_count*/, internal_info && /*info*/)>
         async_multi_del_callback_t;
+    typedef std::function<void(
+        int /*error_code*/, int64_t /*new_value*/, internal_info && /*info*/)>
+        async_incr_callback_t;
+    typedef std::function<void(
+        int /*error_code*/, check_and_set_results && /*results*/, internal_info && /*info*/)>
+        async_check_and_set_callback_t;
+    typedef std::function<void(
+        int /*error_code*/, check_and_mutate_results && /*results*/, internal_info && /*info*/)>
+        async_check_and_mutate_callback_t;
     typedef std::function<void(int /*error_code*/,
                                std::string && /*hash_key*/,
                                std::string && /*sort_key*/,
@@ -187,7 +321,7 @@ public:
         virtual int next(std::string &hashkey,
                          std::string &sortkey,
                          std::string &value,
-                         internal_info *info = NULL) = 0;
+                         internal_info *info = nullptr) = 0;
 
         ///
         /// \brief async get the next key-value pair of this scanner
@@ -266,7 +400,7 @@ public:
                     const std::string &value,
                     int timeout_milliseconds = 5000,
                     int ttl_seconds = 0,
-                    internal_info *info = NULL) = 0;
+                    internal_info *info = nullptr) = 0;
 
     ///
     /// \brief asynchronous set
@@ -315,7 +449,7 @@ public:
                           const std::map<std::string, std::string> &kvs,
                           int timeout_milliseconds = 5000,
                           int ttl_seconds = 0,
-                          internal_info *info = NULL) = 0;
+                          internal_info *info = nullptr) = 0;
 
     ///
     /// \brief asynchronous multi_set (guarantee atomicity)
@@ -360,7 +494,7 @@ public:
                     const std::string &sortkey,
                     std::string &value,
                     int timeout_milliseconds = 5000,
-                    internal_info *info = NULL) = 0;
+                    internal_info *info = nullptr) = 0;
 
     ///
     /// \brief asynchronous get
@@ -411,7 +545,7 @@ public:
                           int max_fetch_count = 100,
                           int max_fetch_size = 1000000,
                           int timeout_milliseconds = 5000,
-                          internal_info *info = NULL) = 0;
+                          internal_info *info = nullptr) = 0;
 
     ///
     /// \brief asynchronous multi_get
@@ -473,7 +607,7 @@ public:
                           int max_fetch_count = 100,
                           int max_fetch_size = 1000000,
                           int timeout_milliseconds = 5000,
-                          internal_info *info = NULL) = 0;
+                          internal_info *info = nullptr) = 0;
 
     ///
     /// \brief asynchronous multi_get
@@ -532,7 +666,7 @@ public:
                                    int max_fetch_count = 100,
                                    int max_fetch_size = 1000000,
                                    int timeout_milliseconds = 5000,
-                                   internal_info *info = NULL) = 0;
+                                   internal_info *info = nullptr) = 0;
 
     ///
     /// \brief asynchronous multi_get_sortkeys
@@ -576,7 +710,7 @@ public:
     virtual int exist(const std::string &hashkey,
                       const std::string &sortkey,
                       int timeout_milliseconds = 5000,
-                      internal_info *info = NULL) = 0;
+                      internal_info *info = nullptr) = 0;
 
     ///
     /// \brief sortkey_count
@@ -594,7 +728,7 @@ public:
     virtual int sortkey_count(const std::string &hashkey,
                               int64_t &count,
                               int timeout_milliseconds = 5000,
-                              internal_info *info = NULL) = 0;
+                              internal_info *info = nullptr) = 0;
 
     ///
     /// \brief del
@@ -613,7 +747,7 @@ public:
     virtual int del(const std::string &hashkey,
                     const std::string &sortkey,
                     int timeout_milliseconds = 5000,
-                    internal_info *info = NULL) = 0;
+                    internal_info *info = nullptr) = 0;
 
     ///
     /// \brief asynchronous del
@@ -655,7 +789,7 @@ public:
                           const std::set<std::string> &sortkeys,
                           int64_t &deleted_count,
                           int timeout_milliseconds = 5000,
-                          internal_info *info = NULL) = 0;
+                          internal_info *info = nullptr) = 0;
 
     ///
     /// \brief asynchronous multi_del
@@ -679,6 +813,231 @@ public:
                                  int timeout_milliseconds = 5000) = 0;
 
     ///
+    /// \brief incr
+    ///     atomically increment value by key from the cluster.
+    ///     key is composed of hashkey and sortkey. must provide both to get the value.
+    ///
+    ///     the increment semantic is the same as redis:
+    ///       - if old data is not found or empty, then set initial value to 0.
+    ///       - if old data is not an integer or out of range, then return PERR_INVALID_ARGUMENT,
+    ///         and return `new_value' as 0.
+    ///       - if new value is out of range, then return PERR_INVALID_ARGUMENT, and return old
+    ///         value in `new_value'.
+    ///
+    ///     if ttl_seconds == 0, the semantic is also the same as redis:
+    ///       - normally, increment will preserve the original ttl.
+    ///       - if old data is expired by ttl, then set initial value to 0 and set no ttl.
+    ///     if ttl_seconds > 0, then update with the new ttl if incr succeed.
+    ///     if ttl_seconds == -1, then update to no ttl if incr succeed.
+    ///
+    /// \param hashkey
+    /// used to decide which partition to get this k-v
+    /// \param sortkey
+    /// all the k-v under hashkey will be sorted by sortkey.
+    /// \param increment
+    /// the value we want to increment.
+    /// \param new_value
+    /// out param to return the new value if increment succeed.
+    /// \param timeout_milliseconds
+    /// if wait longer than this value, will return time out error
+    /// \param ttl_seconds
+    /// time to live of this value.
+    /// \return
+    /// int, the error indicates whether or not the operation is succeeded.
+    /// this error can be converted to a string using get_error_string().
+    ///
+    virtual int incr(const std::string &hashkey,
+                     const std::string &sortkey,
+                     int64_t increment,
+                     int64_t &new_value,
+                     int timeout_milliseconds = 5000,
+                     int ttl_seconds = 0,
+                     internal_info *info = nullptr) = 0;
+
+    ///
+    /// \brief asynchronous incr
+    ///     atomically increment value by key from the cluster.
+    ///     will not be blocked, return immediately.
+    ///
+    ///     the increment semantic is the same as redis:
+    ///       - if old data is not found or empty, then set initial value to 0.
+    ///       - if old data is not an integer or out of range, then return PERR_INVALID_ARGUMENT,
+    ///         and return `new_value' as 0.
+    ///       - if new value is out of range, then return PERR_INVALID_ARGUMENT, and return old
+    ///         value in `new_value'.
+    ///
+    ///     if ttl_seconds == 0, the semantic is also the same as redis:
+    ///       - normally, increment will preserve the original ttl.
+    ///       - if old data is expired by ttl, then set initial value to 0 and set no ttl.
+    ///     if ttl_seconds > 0, then update with the new ttl if incr succeed.
+    ///     if ttl_seconds == -1, then update to no ttl if incr succeed.
+    ///
+    /// \param hashkey
+    /// used to decide which partition to get this k-v
+    /// \param sortkey
+    /// all the k-v under hashkey will be sorted by sortkey.
+    /// \param increment
+    /// the value we want to increment.
+    /// \param callback
+    /// the callback function will be invoked after operation finished or error occurred.
+    /// \param timeout_milliseconds
+    /// if wait longer than this value, will return time out error
+    /// \param ttl_seconds
+    /// time to live of this value.
+    /// \return
+    /// void.
+    ///
+    virtual void async_incr(const std::string &hashkey,
+                            const std::string &sortkey,
+                            int64_t increment,
+                            async_incr_callback_t &&callback = nullptr,
+                            int timeout_milliseconds = 5000,
+                            int ttl_seconds = 0) = 0;
+
+    ///
+    /// \brief check_and_set
+    ///     atomically check and set value by key from the cluster.
+    ///     the value will be set if and only if check passed.
+    ///     the sort key for checking and setting can be the same or different.
+    /// \param hash_key
+    /// used to decide which partition to get this k-v
+    /// \param check_sort_key
+    /// the sort key to check.
+    /// \param check_type
+    /// the check type.
+    /// \param check_operand
+    /// the check operand.
+    /// \param set_sort_key
+    /// the sort key to set value if check passed.
+    /// \param set_value
+    /// the value to set if check passed.
+    /// \param options
+    /// the check-and-set options.
+    /// \param results
+    /// the check-and-set results.
+    /// \param timeout_milliseconds
+    /// if wait longer than this value, will return time out error
+    /// \return
+    /// int, the error indicates whether or not the operation is succeeded.
+    /// this error can be converted to a string using get_error_string().
+    /// if check type is int compare, and check_operand/check_value is not integer
+    /// or out of range, then return PERR_INVALID_ARGUMENT.
+    ///
+    virtual int check_and_set(const std::string &hash_key,
+                              const std::string &check_sort_key,
+                              cas_check_type check_type,
+                              const std::string &check_operand,
+                              const std::string &set_sort_key,
+                              const std::string &set_value,
+                              const check_and_set_options &options,
+                              check_and_set_results &results,
+                              int timeout_milliseconds = 5000,
+                              internal_info *info = nullptr) = 0;
+
+    ///
+    /// \brief asynchronous check_and_set
+    ///     atomically check and set value by key from the cluster.
+    ///     will not be blocked, return immediately.
+    /// \param hash_key
+    /// used to decide which partition to get this k-v
+    /// \param check_sort_key
+    /// the sort key to check.
+    /// \param check_type
+    /// the check type.
+    /// \param check_operand
+    /// the check operand.
+    /// \param set_sort_key
+    /// the sort key to set value if check passed.
+    /// \param set_value
+    /// the value to set if check passed.
+    /// \param options
+    /// the check-and-set options.
+    /// \param callback
+    /// the callback function will be invoked after operation finished or error occurred.
+    /// \param timeout_milliseconds
+    /// if wait longer than this value, will return time out error
+    /// \return
+    /// void.
+    ///
+    virtual void async_check_and_set(const std::string &hash_key,
+                                     const std::string &check_sort_key,
+                                     cas_check_type check_type,
+                                     const std::string &check_operand,
+                                     const std::string &set_sort_key,
+                                     const std::string &set_value,
+                                     const check_and_set_options &options,
+                                     async_check_and_set_callback_t &&callback = nullptr,
+                                     int timeout_milliseconds = 5000) = 0;
+
+    ///
+    /// \brief check_and_mutate
+    ///     atomically check and mutate from the cluster.
+    ///     the mutations will be applied if and only if check passed.
+    /// \param hash_key
+    /// used to decide which partition to get this k-v
+    /// \param check_sort_key
+    /// the sort key to check.
+    /// \param check_type
+    /// the check type.
+    /// \param check_operand
+    /// the check operand.
+    /// \param mutations
+    /// the list of mutations to perform if check condition is satisfied.
+    /// \param options
+    /// the check-and-mutate options.
+    /// \param results
+    /// the check-and-mutate results.
+    /// \param timeout_milliseconds
+    /// if wait longer than this value, will return time out error
+    /// \return
+    /// int, the error indicates whether or not the operation is succeeded.
+    /// this error can be converted to a string using get_error_string().
+    /// if check type is int compare, and check_operand/check_value is not integer
+    /// or out of range, then return PERR_INVALID_ARGUMENT.
+    ///
+    virtual int check_and_mutate(const std::string &hash_key,
+                                 const std::string &check_sort_key,
+                                 cas_check_type check_type,
+                                 const std::string &check_operand,
+                                 const mutations &mutations,
+                                 const check_and_mutate_options &options,
+                                 check_and_mutate_results &results,
+                                 int timeout_milliseconds = 5000,
+                                 internal_info *info = nullptr) = 0;
+
+    ///
+    /// \brief asynchronous check_and_mutate
+    ///     atomically check and mutate from the cluster.
+    ///     will not be blocked, return immediately.
+    /// \param hash_key
+    /// used to decide which partition to get this k-v
+    /// \param check_sort_key
+    /// the sort key to check.
+    /// \param check_type
+    /// the check type.
+    /// \param check_operand
+    /// the check operand.
+    /// \param mutations
+    /// the list of mutations to perform if check condition is satisfied.
+    /// \param options
+    /// the check-and-mutate options.
+    /// \param callback
+    /// the callback function will be invoked after operation finished or error occurred.
+    /// \param timeout_milliseconds
+    /// if wait longer than this value, will return time out error
+    /// \return
+    /// void.
+    ///
+    virtual void async_check_and_mutate(const std::string &hash_key,
+                                        const std::string &check_sort_key,
+                                        cas_check_type check_type,
+                                        const std::string &check_operand,
+                                        const mutations &mutations,
+                                        const check_and_mutate_options &options,
+                                        async_check_and_mutate_callback_t &&callback = nullptr,
+                                        int timeout_milliseconds = 5000) = 0;
+
+    ///
     /// \brief ttl (time to live)
     ///     get ttl in seconds of this k-v.
     ///     key is composed of hashkey and sortkey. must provide both to get the value.
@@ -698,7 +1057,7 @@ public:
                     const std::string &sortkey,
                     int &ttl_seconds,
                     int timeout_milliseconds = 5000,
-                    internal_info *info = NULL) = 0;
+                    internal_info *info = nullptr) = 0;
 
     ///
     /// \brief get hash scanner
@@ -817,4 +1176,4 @@ public:
     static pegasus_client *get_client(const char *cluster_name, const char *app_name);
 };
 
-} // namespace
+} // namespace pegasus

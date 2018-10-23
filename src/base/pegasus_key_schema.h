@@ -154,4 +154,4 @@ inline uint64_t pegasus_key_hash(const T &key)
     }
 }
 
-} // namespace
+} // namespace pegasus

@@ -189,6 +189,78 @@ function run_build()
         exit 1
     fi
 
+    echo "INFO: start build rocksdb..."
+    ROCKSDB_BUILD_DIR="$ROOT/rocksdb/build"
+    CMAKE_OPTIONS="-DCMAKE_C_COMPILER=$C_COMPILER -DCMAKE_CXX_COMPILER=$CXX_COMPILER"
+    if [ "$WARNING_ALL" == "YES" ]
+    then
+        echo "WARNING_ALL=YES"
+        CMAKE_OPTIONS="$CMAKE_OPTIONS -DWARNING_ALL=TRUE"
+    else
+        echo "WARNING_ALL=NO"
+    fi
+    if [ "$ENABLE_GCOV" == "YES" ]
+    then
+        echo "ENABLE_GCOV=YES"
+        CMAKE_OPTIONS="$CMAKE_OPTIONS -DENABLE_GCOV=TRUE"
+    else
+        echo "ENABLE_GCOV=NO"
+    fi
+    if [ "$BUILD_TYPE" == "debug" ]
+    then
+        echo "BUILD_TYPE=debug"
+        CMAKE_OPTIONS="$CMAKE_OPTIONS -DCMAKE_BUILD_TYPE=Debug"
+    else
+        echo "BUILD_TYPE=release"
+    fi
+
+    if [ -f $ROCKSDB_BUILD_DIR/CMAKE_OPTIONS ]
+    then
+        LAST_OPTIONS=`cat $ROCKSDB_BUILD_DIR/CMAKE_OPTIONS`
+        if [ "$CMAKE_OPTIONS" != "$LAST_OPTIONS" ]
+        then
+            echo "WARNING: CMAKE_OPTIONS has changed from last build, clear environment first"
+            CLEAR=YES
+        fi
+    fi
+
+    if [ "$CLEAR" == "YES" ] && [ -d "$ROCKSDB_BUILD_DIR" ]
+    then
+        echo "Clear $ROCKSDB_BUILD_DIR ..."
+        rm -rf $ROCKSDB_BUILD_DIR
+    fi
+
+    if [ ! -f $ROCKSDB_BUILD_DIR/Makefile ]; then
+        echo "Running cmake..."
+        mkdir -p $ROCKSDB_BUILD_DIR
+        cd $ROCKSDB_BUILD_DIR
+        echo "$CMAKE_OPTIONS" >CMAKE_OPTIONS
+        cmake .. -DCMAKE_INSTALL_PREFIX=$ROCKSDB_BUILD_DIR $CMAKE_OPTIONS
+        if [ $? -ne 0 ]; then
+            echo "ERROR: cmake failed"
+            exit 1
+        fi
+    else
+        cd $ROCKSDB_BUILD_DIR
+    fi
+
+    echo "Building..."
+    if [ "$RUN_VERBOSE" == "YES" ]
+    then
+        echo "RUN_VERBOSE=YES"
+        MAKE_OPTIONS="$MAKE_OPTIONS VERBOSE=1"
+    else
+        echo "RUN_VERBOSE=NO"
+    fi
+    make install -j $JOB_NUM $MAKE_OPTIONS
+    if [ $? -ne 0 ]
+    then
+        echo "ERROR: build rocksdb failed"
+        exit 1
+    else
+        echo "Build rocksdb succeed"
+    fi
+
     echo "INFO: start build pegasus..."
     cd $ROOT/src
     C_COMPILER="$C_COMPILER" CXX_COMPILER="$CXX_COMPILER" BUILD_TYPE="$BUILD_TYPE" \
@@ -289,21 +361,16 @@ function usage_start_zk()
     echo "                     if not set, then default is './.zk_install'"
     echo "   -p|--port <port>  listen port of zookeeper, default is 22181"
 }
+
 function run_start_zk()
 {
     # first we check the environment that zk need: java and nc command
     # check java
-    java -help 1>/dev/null 2>/dev/null
-    if [ $? != 0 ]; then
-        echo "start zk failed, need install jre..."
-        exit 1
-    fi
+    type java >/dev/null 2>&1 || { echo >&2 "start zk failed, need install jre..."; exit 1;}
+
     # check nc command
-    nc -help 1>/dev/null 2>/dev/null
-    if [ $? != 0 ]; then
-        echo "start zk failed, need install netcat command..."
-        exit 1
-    fi
+    type nc >/dev/null 2>&1 || { echo >&2 "start zk failed, need install netcat command..."; exit 1;}
+
     INSTALL_DIR=`pwd`/.zk_install
     PORT=22181
     while [[ $# > 0 ]]; do
@@ -1388,24 +1455,21 @@ function usage_bench()
 {
     echo "Options for subcommand 'bench':"
     echo "   -h|--help            print the help info"
-    echo "   -c|--config <path>   config file path, default './config-bench.ini'"
     echo "   -t|--type            benchmark type, supporting:"
-    echo "                          fillseq_pegasus, fillrandom_pegasus, filluniquerandom_pegasus,"
-    echo "                          readrandom_pegasus, deleteseq_pegasus, deleterandom_pegasus"
-    echo "                        default is 'fillseq_pegasus,readrandom_pegasus'"
+    echo "                          fillseq_pegasus, fillrandom_pegasus, readrandom_pegasus, filluniquerandom_pegasus,"
+    echo "                          deleteseq_pegasus,deleterandom_pegasus,multi_set_pegasus,scan_pegasus"
+    echo "                        default is fillseq_pegasus,readrandom_pegasus"
     echo "   -n <num>             number of key/value pairs, default 100000"
     echo "   --cluster <str>      cluster meta lists, default '127.0.0.1:34601,127.0.0.1:34602,127.0.0.1:34603'"
     echo "   --app_name <str>     app name, default 'temp'"
     echo "   --thread_num <num>   number of threads, default 1"
     echo "   --key_size <num>     key size, default 16"
     echo "   --value_size <num>   value size, default 100"
-    echo "   --timeout <num>      timeout in milliseconds, default 10000"
+    echo "   --timeout <num>      timeout in milliseconds, default 1000"
 }
 
 function run_bench()
 {
-    CONFIG=${ROOT}/config-bench.ini
-    CONFIG_SPECIFIED=0
     TYPE=fillseq_pegasus,readrandom_pegasus
     NUM=100000
     CLUSTER=127.0.0.1:34601,127.0.0.1:34602,127.0.0.1:34603
@@ -1413,18 +1477,13 @@ function run_bench()
     THREAD=1
     KEY_SIZE=16
     VALUE_SIZE=100
-    TIMEOUT_MS=10000
+    TIMEOUT_MS=1000
     while [[ $# > 0 ]]; do
         key="$1"
         case $key in
             -h|--help)
                 usage_bench
                 exit 0
-                ;;
-            -c|--config)
-                CONFIG="$2"
-                CONFIG_SPECIFIED=1
-                shift
                 ;;
             -t|--type)
                 TYPE="$2"
@@ -1468,16 +1527,13 @@ function run_bench()
         shift
     done
 
-    if [ ${CONFIG_SPECIFIED} -eq 0 ]; then
-        sed "s/@CLUSTER@/$CLUSTER/g" ${ROOT}/src/config-bench.ini >${CONFIG}
-    fi
-
     cd ${ROOT}
+    sed -i "s/@CLUSTER@/$CLUSTER/g" ${DSN_ROOT}/bin/pegasus_bench/config.ini
     ln -s -f ${DSN_ROOT}/bin/pegasus_bench/pegasus_bench
-    ./pegasus_bench --pegasus_config=${CONFIG} --benchmarks=${TYPE} --pegasus_timeout_ms=${TIMEOUT_MS} \
+    ./pegasus_bench --pegasus_config=${DSN_ROOT}/bin/pegasus_bench/config.ini --benchmarks=${TYPE} --pegasus_timeout_ms=${TIMEOUT_MS} \
         --key_size=${KEY_SIZE} --value_size=${VALUE_SIZE} --threads=${THREAD} --num=${NUM} \
         --pegasus_cluster_name=mycluster --pegasus_app_name=${APP} --stats_interval=1000 --histogram=1 \
-        --compression_type=none --compression_ratio=1.0
+        --compression_ratio=1.0
 }
 
 #####################
@@ -1490,7 +1546,7 @@ function usage_shell()
     echo "   -c|--config <path>   config file path, default './config-shell.ini.{PID}'"
     echo "   --cluster <str>      cluster meta lists, default '127.0.0.1:34601,127.0.0.1:34602,127.0.0.1:34603'"
     echo "   -n <cluster-name>    cluster name. Will try to get a cluster ip_list"
-    echo "                        from your MINOS-config(through \$MINOS_CONFIG_FILE) or"
+    echo "                        from your minos config (\$MINOS2_CONFIG_FILE or \$MINOS_CONFIG_FILE) or"
     echo "                        from [uri-resolve.dsn://<cluster-name>] of your config-file"
 }
 
@@ -1547,30 +1603,53 @@ function run_shell()
 
     if [ $CLUSTER_NAME_SPECIFIED -eq 1 ]; then
         meta_section="/tmp/minos.config.cluster.meta.section.$UID"
-        pegasus_config_file=$(dirname $MINOS_CONFIG_FILE)/xiaomi-config/conf/pegasus/pegasus-${CLUSTER_NAME}.cfg
-        if [ -f $pegasus_config_file ]; then
-            meta_section_start=$(grep -n "\[meta" $pegasus_config_file | head -1 | cut -d":" -f 1)
-            meta_section_end=$(grep -n "\[replica" $pegasus_config_file | head -1 | cut -d":" -f 1)
-            sed -n "${meta_section_start},${meta_section_end}p" $pegasus_config_file > $meta_section
+        if [ ! -z "$MINOS2_CONFIG_FILE" ]; then
+            minos2_config_file=$(dirname $MINOS2_CONFIG_FILE)/xiaomi-config/conf/pegasus/pegasus-${CLUSTER_NAME}.yaml
+        fi
+        if [ ! -z "$MINOS_CONFIG_FILE" ]; then
+            minos_config_file=$(dirname $MINOS_CONFIG_FILE)/xiaomi-config/conf/pegasus/pegasus-${CLUSTER_NAME}.cfg
+        fi
+
+        if [ ! -z "$MINOS2_CONFIG_FILE" -a -f "$minos2_config_file" ]; then
+            meta_section_start=$(grep -n "^ *meta:" $minos2_config_file | head -1 | cut -d":" -f 1)
+            meta_section_end=$(grep -n "^ *replica:" $minos2_config_file | head -1 | cut -d":" -f 1)
+            sed -n "${meta_section_start},${meta_section_end}p" $minos2_config_file > $meta_section
             if [ $? -ne 0 ]; then
-                echo "write $pegasus_config_file meta_info to $meta_section failed"
+                echo "ERROR: write $minos2_config_file meta section to $meta_section failed"
+                exit 1
             else
-                base_port=$(grep "base_port=" $meta_section | cut -d"=" -f2)
-                hosts_list=$(grep " host\.[0-9]*" $meta_section | grep -oh "[0-9]*\.[0-9]*\.[0-9]*\.[0-9]*")
-                if [ ! -z "$base_port" ] && [ ! -z "$hosts_list" ]; then
-                    meta_list=()
-                    for h in $hosts_list; do
-                        meta_list+=($h":"$[ $base_port + 1 ])
-                    done
-                    OLD_IFS="$IFS"
-                    IFS="," && CLUSTER="${meta_list[*]}" && IFS="$OLD_IFS"
-                    echo "parse meta_list $CLUSTER from $pegasus_config_file"
-                else
-                    echo "parse meta_list from $pegasus_config_file failed"
-                fi
+                base_port=$(grep "^ *base *:" $meta_section | cut -d":" -f2)
+                hosts_list=$(grep "^ *- *[0-9]*" $meta_section | grep -oh "[0-9]*\.[0-9]*\.[0-9]*\.[0-9]*")
+                config_file=$minos2_config_file
+            fi
+        elif [ ! -z "$MINOS_CONFIG_FILE" -a -f "$minos_config_file" ]; then
+            meta_section_start=$(grep -n "\[meta" $minos_config_file | head -1 | cut -d":" -f 1)
+            meta_section_end=$(grep -n "\[replica" $minos_config_file | head -1 | cut -d":" -f 1)
+            sed -n "${meta_section_start},${meta_section_end}p" $minos_config_file > $meta_section
+            if [ $? -ne 0 ]; then
+                echo "ERROR: write $minos_config_file meta section to $meta_section failed"
+                exit 1
+            else
+                base_port=$(grep "^ *base_port *=" $meta_section | cut -d"=" -f2)
+                hosts_list=$(grep "^ *host\.[0-9]*" $meta_section | grep -oh "[0-9]*\.[0-9]*\.[0-9]*\.[0-9]*")
+                config_file=$minos_config_file
             fi
         else
-            echo "can't find file $pegasus_config_file, please check you env \$MINOS_CONFIG_FILE"
+            echo "ERROR: can't find minos config file for $CLUSTER_NAME, please check env \$MINOS2_CONFIG_FILE or \$MINOS_CONFIG_FILE"
+            exit 1
+        fi
+
+        if [ ! -z "$base_port" ] && [ ! -z "$hosts_list" ]; then
+            meta_list=()
+            for h in $hosts_list; do
+                meta_list+=($h":"$[ $base_port + 1 ])
+            done
+            OLD_IFS="$IFS"
+            IFS="," && CLUSTER="${meta_list[*]}" && IFS="$OLD_IFS"
+            echo "INFO: parse meta_list from $config_file"
+        else
+            echo "ERROR: parse meta_list from $config_file failed"
+            exit 1
         fi
     fi
 

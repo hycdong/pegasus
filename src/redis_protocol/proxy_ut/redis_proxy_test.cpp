@@ -3,9 +3,12 @@
 // can be found in the LICENSE file in the root directory of this source tree.
 
 #include <algorithm>
+#include <memory>
 #include <string>
 #include <boost/lexical_cast.hpp>
 #include <boost/asio.hpp>
+
+#include <dsn/utility/string_conv.h>
 
 #include <gtest/gtest.h>
 #include <rrdb/rrdb.client.h>
@@ -19,20 +22,21 @@ using namespace ::pegasus::proxy;
 class proxy_app : public ::dsn::service_app
 {
 public:
-    proxy_app(const dsn::service_app_info *info) : service_app(info) {}
-    virtual ~proxy_app() {}
+    explicit proxy_app(const dsn::service_app_info *info) : service_app(info) {}
 
-    virtual ::dsn::error_code start(const std::vector<std::string> &args) override
+    ::dsn::error_code start(const std::vector<std::string> &args) override
     {
-        if (args.size() < 2)
+        if (args.size() < 3) {
             return ::dsn::ERR_INVALID_PARAMETERS;
-        proxy_session::factory f = [](proxy_stub *p, ::dsn::rpc_address remote) {
-            return std::make_shared<redis_parser>(p, remote);
+        }
+
+        proxy_session::factory f = [](proxy_stub *p, dsn::message_ex *m) {
+            return std::make_shared<redis_parser>(p, m);
         };
-        _proxy.reset(new proxy_stub(f, args[1].c_str()));
+        _proxy = dsn::make_unique<proxy_stub>(f, args[1].c_str(), args[2].c_str());
         return ::dsn::ERR_OK;
     }
-    virtual ::dsn::error_code stop(bool) override { return ::dsn::ERR_OK; }
+    ::dsn::error_code stop(bool) override { return ::dsn::ERR_OK; }
 private:
     std::unique_ptr<pegasus::proxy::proxy_stub> _proxy;
 };
@@ -42,13 +46,13 @@ bool blob_compare(const ::dsn::blob &bb1, const ::dsn::blob &bb2)
     return bb1.length() == bb2.length() && memcmp(bb1.data(), bb2.data(), bb1.length()) == 0;
 }
 
-class redis_test_parser1 : public redis_parser
+class redis_test_parser : public redis_parser
 {
 protected:
-    virtual void handle_command(std::unique_ptr<message_entry> &&entry)
+    void handle_command(std::unique_ptr<message_entry> &&entry) override
     {
         redis_request &act_request = entry->request;
-        redis_request &exp_request = reserved_entry[entry_index].request;
+        redis_request &exp_request = reserved_entry[entry_index]->request;
 
         ASSERT_TRUE(act_request.length > 0);
         ASSERT_EQ(act_request.length, exp_request.length);
@@ -65,16 +69,20 @@ protected:
     }
 
 public:
-    redis_test_parser1(proxy_stub *stub, ::dsn::rpc_address addr) : redis_parser(stub, addr)
+    redis_test_parser(proxy_stub *stub, dsn::message_ex *msg) : redis_parser(stub, msg)
     {
-        reserved_entry.resize(20);
+        reserved_entry.reserve(20);
+        for (int i = 0; i < 20; ++i) {
+            reserved_entry.emplace_back(new message_entry());
+        }
+        got_a_message = false;
     }
 
     void test_fixed_cases()
     {
         std::cout << "test fixed cases" << std::endl;
 
-        redis_request &rr = reserved_entry[0].request;
+        redis_request &rr = reserved_entry[0]->request;
         // simple case
         {
             rr.length = 3;
@@ -98,6 +106,36 @@ public:
             auto request2 = create_message(request_data2);
             ASSERT_TRUE(parse(request1));
             ASSERT_TRUE(parse(request2));
+            ASSERT_TRUE(got_a_message);
+        }
+
+        // geo GEORADIUS command
+        {
+            got_a_message = false;
+            entry_index = 0;
+            rr.length = 6;
+            rr.buffers = {
+                {9, "GEORADIUS"}, {0, ""}, {5, "123.4"}, {5, "56.78"}, {3, "100"}, {1, "m"}};
+
+            const char *request_data = "*6\r\n$9\r\nGEORADIUS\r\n$0\r\n\r\n$5\r\n123.4\r\n$5\r\n56."
+                                       "78\r\n$3\r\n100\r\n$1\r\nm\r\n";
+            auto request = create_message(request_data);
+            ASSERT_TRUE(parse(request));
+            ASSERT_TRUE(got_a_message);
+        }
+
+        // geo GEORADIUSBYMEMBER command
+        {
+            got_a_message = false;
+            entry_index = 0;
+            rr.length = 5;
+            rr.buffers = {
+                {17, "GEORADIUSBYMEMBER"}, {0, ""}, {7, "member1"}, {6, "1000.5"}, {2, "km"}};
+
+            const char *request_data = "*5\r\n$17\r\nGEORADIUSBYMEMBER\r\n$0\r\n\r\n$"
+                                       "7\r\nmember1\r\n$6\r\n1000.5\r\n$2\r\nkm\r\n";
+            auto request = create_message(request_data);
+            ASSERT_TRUE(parse(request));
             ASSERT_TRUE(got_a_message);
         }
 
@@ -153,12 +191,12 @@ public:
         std::cout << "test random cases" << std::endl;
 
         int total_requests = 10;
-        std::vector<dsn_message_t> fake_requests;
+        std::vector<dsn::message_ex *> fake_requests;
         int total_body_size = 0;
 
         // create several requests
         for (entry_index = 0; entry_index < total_requests; ++entry_index) {
-            redis_request &ra = reserved_entry[entry_index].request;
+            redis_request &ra = reserved_entry[entry_index]->request;
             ra.length = dsn_random32(1, 20);
             ra.buffers.resize(ra.length);
             for (unsigned int i = 0; i != ra.length; ++i) {
@@ -176,14 +214,14 @@ public:
                     bs.data.assign(std::move(raw_buf), 0, bs.length);
                 }
             }
-            dsn_message_t fake_response = marshalling_array(ra);
-            dsn_message_t fake_request = dsn_msg_copy(fake_response, true, true);
+            dsn::message_ex *fake_response = marshalling_array(ra);
+            dsn::message_ex *fake_request = fake_response->copy(true, true);
 
-            dsn_msg_add_ref(fake_response);
-            dsn_msg_release_ref(fake_response);
+            fake_response->add_ref();
+            fake_response->release_ref();
 
             fake_requests.push_back(fake_request);
-            total_body_size += dsn_msg_body_size(fake_request);
+            total_body_size += fake_request->body_size();
         }
 
         // let's copy the messages
@@ -191,16 +229,16 @@ public:
                                          std::default_delete<char[]>());
         char *raw_msg_buffer = msg_buffer.get();
 
-        for (dsn_message_t r : fake_requests) {
+        for (dsn::message_ex *r : fake_requests) {
             void *rw_ptr;
             size_t length;
-            while (dsn_msg_read_next(r, &rw_ptr, &length)) {
+            while (r->read_next(&rw_ptr, &length)) {
                 memcpy(raw_msg_buffer, rw_ptr, length);
                 raw_msg_buffer += length;
-                dsn_msg_read_commit(r, length);
+                r->read_commit(length);
             }
-            dsn_msg_add_ref(r);
-            dsn_msg_release_ref(r);
+            r->add_ref();
+            r->release_ref();
         }
         *raw_msg_buffer = 0;
 
@@ -209,7 +247,7 @@ public:
         raw_msg_buffer = msg_buffer.get();
         // first create a big message, test the pipeline
         {
-            dsn_message_t msg = create_message(raw_msg_buffer, total_body_size);
+            dsn::message_ex *msg = create_message(raw_msg_buffer, total_body_size);
             entry_index = 0;
             ASSERT_TRUE(parse(msg));
             ASSERT_EQ(entry_index, total_requests);
@@ -230,7 +268,7 @@ public:
             for (unsigned i = 0; i < start_pos.size() - 1; ++i) {
                 if (start_pos[i] != start_pos[i + 1]) {
                     int length = start_pos[i + 1] - start_pos[i];
-                    dsn_message_t msg = create_message(raw_msg_buffer + start_pos[i], length);
+                    dsn::message_ex *msg = create_message(raw_msg_buffer + start_pos[i], length);
                     ASSERT_TRUE(parse(msg));
                 }
             }
@@ -238,26 +276,164 @@ public:
         }
     }
 
-public:
-    static dsn_message_t create_message(const char *data)
+    void test_parse_parameters()
     {
-        dsn_message_t m = dsn_msg_create_received_request(
-            RPC_CALL_RAW_MESSAGE, DSF_THRIFT_BINARY, (void *)data, strlen(data));
-        dsn_msg_add_ref(m);
-        return m;
-    }
-    static dsn_message_t create_message(const char *data, int length)
-    {
-        dsn_message_t m = dsn_msg_create_received_request(
-            RPC_CALL_RAW_MESSAGE, DSF_THRIFT_BINARY, (void *)data, length);
-        dsn_msg_add_ref(m);
-        return m;
-    }
-    static dsn_message_t marshalling_array(const redis_request &ra)
-    {
-        dsn_message_t m = create_message("dummy");
+        double radius_m = 0;
+        std::string unit;
+        pegasus::geo::geo_client::SortType sort_type = pegasus::geo::geo_client::SortType::random;
+        int count = 0;
+        bool WITHCOORD = false;
+        bool WITHDIST = false;
+        bool WITHVALUE = false;
 
-        dsn_message_t result = dsn_msg_create_response(m);
+        {
+            radius_m = 0;
+            sort_type = pegasus::geo::geo_client::SortType::random;
+            count = 0;
+            WITHCOORD = false;
+            WITHDIST = false;
+            WITHVALUE = false;
+            std::vector<redis_bulk_string> opts({{"GEORADIUS"},
+                                                 {""},
+                                                 {"12.3"},
+                                                 {"45.6"},
+                                                 {"100"},
+                                                 {"m"},
+                                                 {"WITHCOORD"},
+                                                 {"WITHDIST"},
+                                                 {"WITHHASH"},
+                                                 {"COUNT"},
+                                                 {"-1"},
+                                                 {"ASC"},
+                                                 {"WITHVALUE"}});
+
+            parse_geo_radius_parameters(
+                opts, 4, radius_m, unit, sort_type, count, WITHCOORD, WITHDIST, WITHVALUE);
+
+            ASSERT_DOUBLE_EQ(radius_m, 100);
+            ASSERT_EQ(unit, "m");
+            ASSERT_EQ(sort_type, pegasus::geo::geo_client::SortType::asc);
+            ASSERT_EQ(count, -1);
+            ASSERT_TRUE(WITHCOORD);
+            ASSERT_TRUE(WITHDIST);
+            ASSERT_TRUE(WITHVALUE);
+        }
+
+        {
+            radius_m = 0;
+            sort_type = pegasus::geo::geo_client::SortType::random;
+            count = 0;
+            WITHCOORD = false;
+            WITHDIST = false;
+            WITHVALUE = false;
+            std::vector<redis_bulk_string> opts({{"GEORADIUS"},
+                                                 {""},
+                                                 {"12.3"},
+                                                 {"45.6"},
+                                                 {"100.23"},
+                                                 {"km"},
+                                                 {"COUNT"},
+                                                 {"500"},
+                                                 {"DESC"}});
+
+            parse_geo_radius_parameters(
+                opts, 4, radius_m, unit, sort_type, count, WITHCOORD, WITHDIST, WITHVALUE);
+
+            ASSERT_DOUBLE_EQ(radius_m, 100230);
+            ASSERT_EQ(unit, "km");
+            ASSERT_EQ(sort_type, pegasus::geo::geo_client::SortType::desc);
+            ASSERT_EQ(count, 500);
+            ASSERT_FALSE(WITHCOORD);
+            ASSERT_FALSE(WITHDIST);
+            ASSERT_FALSE(WITHVALUE);
+        }
+
+        {
+            radius_m = 0;
+            sort_type = pegasus::geo::geo_client::SortType::random;
+            count = 0;
+            WITHCOORD = false;
+            WITHDIST = false;
+            WITHVALUE = false;
+            std::vector<redis_bulk_string> opts({{"GEORADIUSBYMEMBER"},
+                                                 {""},
+                                                 {"somekey"},
+                                                 {"100"},
+                                                 {"m"},
+                                                 {"WITHCOORD"},
+                                                 {"WITHDIST"},
+                                                 {"WITHHASH"},
+                                                 {"COUNT"},
+                                                 {"-1"},
+                                                 {"ASC"},
+                                                 {"WITHVALUE"}});
+
+            parse_geo_radius_parameters(
+                opts, 3, radius_m, unit, sort_type, count, WITHCOORD, WITHDIST, WITHVALUE);
+
+            ASSERT_DOUBLE_EQ(radius_m, 100);
+            ASSERT_EQ(unit, "m");
+            ASSERT_EQ(sort_type, pegasus::geo::geo_client::SortType::asc);
+            ASSERT_EQ(count, -1);
+            ASSERT_TRUE(WITHCOORD);
+            ASSERT_TRUE(WITHDIST);
+            ASSERT_TRUE(WITHVALUE);
+        }
+
+        {
+            radius_m = 0;
+            sort_type = pegasus::geo::geo_client::SortType::random;
+            count = 0;
+            WITHCOORD = false;
+            WITHDIST = false;
+            WITHVALUE = false;
+            std::vector<redis_bulk_string> opts({{"GEORADIUSBYMEMBER"},
+                                                 {""},
+                                                 {"somekey"},
+                                                 {"100.23"},
+                                                 {"km"},
+                                                 {"COUNT"},
+                                                 {"500"},
+                                                 {"DESC"}});
+
+            parse_geo_radius_parameters(
+                opts, 3, radius_m, unit, sort_type, count, WITHCOORD, WITHDIST, WITHVALUE);
+
+            ASSERT_DOUBLE_EQ(radius_m, 100230);
+            ASSERT_EQ(unit, "km");
+            ASSERT_EQ(sort_type, pegasus::geo::geo_client::SortType::desc);
+            ASSERT_EQ(count, 500);
+            ASSERT_FALSE(WITHCOORD);
+            ASSERT_FALSE(WITHDIST);
+            ASSERT_FALSE(WITHVALUE);
+        }
+
+        {
+            int ttl_seconds = 0;
+            std::vector<redis_bulk_string> opts({{"SET"}, {"KK"}, {"vv"}, {"EX"}, {"123"}});
+            parse_set_parameters(opts, ttl_seconds);
+            ASSERT_EQ(ttl_seconds, 123);
+        }
+    }
+
+public:
+    static dsn::message_ex *create_message(const char *data)
+    {
+        dsn::message_ex *m = dsn::message_ex::create_received_request(
+            RPC_CALL_RAW_MESSAGE, dsn::DSF_THRIFT_BINARY, (void *)data, strlen(data));
+        return m;
+    }
+    static dsn::message_ex *create_message(const char *data, int length)
+    {
+        dsn::message_ex *m = dsn::message_ex::create_received_request(
+            RPC_CALL_RAW_MESSAGE, dsn::DSF_THRIFT_BINARY, (void *)data, length);
+        return m;
+    }
+    static dsn::message_ex *marshalling_array(const redis_request &ra)
+    {
+        dsn::message_ex *m = create_message("dummy");
+
+        dsn::message_ex *result = m->create_response();
         ::dsn::rpc_write_stream stream(result);
 
         stream.write_pod('*');
@@ -267,23 +443,32 @@ public:
         stream.write_pod('\n');
 
         for (unsigned int i = 0; i != ra.length; ++i) {
-            redis_parser::marshalling(stream, ra.buffers[i]);
+            ra.buffers[i].marshalling(stream);
         }
-        dsn_msg_release_ref(m);
+
+        m->release_ref();
         return result;
     }
 
-    std::vector<message_entry> reserved_entry;
+    std::vector<std::unique_ptr<message_entry>> reserved_entry;
     int entry_index;
     bool got_a_message;
 };
 
 TEST(proxy, parser)
 {
-    std::shared_ptr<redis_test_parser1> parser(
-        new redis_test_parser1(nullptr, ::dsn::rpc_address("127.0.0.1", 123)));
+    dsn::message_ex *m = nullptr;
+    {
+        m = dsn::message_ex::create_received_request(
+            RPC_CALL_RAW_MESSAGE, dsn::DSF_THRIFT_BINARY, nullptr, 0);
+        dsn::message_ex *msg = (dsn::message_ex *)m;
+        msg->header->from_address = dsn::rpc_address("127.0.0.1", 123);
+    }
+    std::shared_ptr<redis_test_parser> parser(new redis_test_parser(nullptr, m));
     parser->test_fixed_cases();
     parser->test_random_cases();
+    parser->test_parse_parameters();
+    m->release_ref();
 }
 
 TEST(proxy, utils)
@@ -306,7 +491,7 @@ TEST(proxy, utils)
 
     for (int i = 0; int_buffers[i]; ++i) {
         int result;
-        bool succeed = pegasus::utils::buf2int(int_buffers[i], strlen(int_buffers[i]), result);
+        bool succeed = dsn::buf2int32(int_buffers[i], result);
 
         ASSERT_EQ(call_results[i].succeed, succeed);
         if (result == true) {

@@ -7,7 +7,7 @@
 #include <vector>
 #include <rocksdb/db.h>
 #include <rocksdb/listener.h>
-#include <dsn/cpp/perf_counter_wrapper.h>
+#include <dsn/perf_counter/perf_counter_wrapper.h>
 #include <dsn/dist/replication/replication.codes.h>
 #include <rrdb/rrdb_types.h>
 #include <rrdb/rrdb.server.h>
@@ -75,7 +75,7 @@ public:
     /// \inherit dsn::replication::replication_app_base
     virtual int on_batched_write_requests(int64_t decree,
                                           uint64_t timestamp,
-                                          dsn_message_t *requests,
+                                          dsn::message_ex **requests,
                                           int count) override;
 
     virtual ::dsn::error_code prepare_get_checkpoint(dsn::blob &learn_req) override
@@ -192,7 +192,11 @@ private:
                                        bool no_value);
 
     // return true if the filter type is supported
-    bool is_filter_type_supported(::dsn::apps::filter_type::type filter_type);
+    bool is_filter_type_supported(::dsn::apps::filter_type::type filter_type)
+    {
+        return filter_type >= ::dsn::apps::filter_type::FT_NO_FILTER &&
+               filter_type <= ::dsn::apps::filter_type::FT_MATCH_POSTFIX;
+    }
 
     // return true if the data is valid for the filter
     bool validate_filter(::dsn::apps::filter_type::type filter_type,

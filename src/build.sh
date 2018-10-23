@@ -100,6 +100,9 @@ else
 fi
 
 echo "CMAKE_OPTIONS=$CMAKE_OPTIONS"
+
+#rocksdb enable jemalloc by default, but we use regular malloc.
+MAKE_OPTIONS="$MAKE_OPTIONS DISABLE_JEMALLOC=1"
 echo "MAKE_OPTIONS=$MAKE_OPTIONS"
 
 echo "#############################################################################"
@@ -114,39 +117,10 @@ then
     fi
 fi
 
-if [ "$CLEAR" == "YES" ]
-then
-    echo "Clear librocksdb.a ..."
-    rm -rf $BUILD_DIR
-    make -C ../rocksdb clean
-fi
-
 if [ "$CLEAR" == "YES" -o "$PART_CLEAR" == "YES" ]
 then
     echo "Clear $BUILD_DIR ..."
     rm -rf $BUILD_DIR
-    rm -f ../rocksdb/pegasus_bench
-fi
-
-# use ccache if possible
-if [ `command -v ccache` ]
-then
-    ROCKSDB_CC="ccache $C_COMPILER"
-    ROCKSDB_CXX="ccache $CXX_COMPILER"
-else
-    ROCKSDB_CC="$C_COMPILER"
-    ROCKSDB_CXX="$CXX_COMPILER"
-fi
-
-echo "ROCKDB_CC=$ROCKSDB_CC"
-echo "ROCKSDB_CXX=$ROCKSDB_CXX"
-CC=$ROCKSDB_CC CXX=$ROCKSDB_CXX make -C ../rocksdb static_lib_$BUILD_TYPE $MAKE_OPTIONS
-if [ $? -ne 0 ]
-then
-    echo "ERROR: build librocksdb.a failed"
-    exit 1
-else
-    echo "Build librocksdb.a succeed"
 fi
 
 if [ ! -d "$BUILD_DIR" ]
@@ -186,15 +160,3 @@ else
 fi
 cd ..
 
-rm -f ../rocksdb/pegasus_bench &>/dev/null
-make -C ../rocksdb pegasus_bench_$BUILD_TYPE $MAKE_OPTIONS
-if [ $? -ne 0 ]
-then
-    echo "ERROR: build pegasus_bench failed"
-    exit 1
-else
-    mkdir -p $DSN_ROOT/bin/pegasus_bench
-    mv ../rocksdb/pegasus_bench $DSN_ROOT/bin/pegasus_bench/pegasus_bench
-    cp ./config-bench.ini $DSN_ROOT/bin/pegasus_bench/config.ini
-    echo "Build pegasus_bench succeed"
-fi

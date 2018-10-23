@@ -23,12 +23,6 @@
 namespace pegasus {
 namespace server {
 
-// Although we have removed the INCR operator, but we need reserve the code for compatibility
-// reason,
-// because there may be some mutation log entries which include the code. Even if these entries need
-// not to be applied to rocksdb, they may be deserialized.
-DEFINE_TASK_CODE_RPC(RPC_RRDB_RRDB_INCR, TASK_PRIORITY_COMMON, ::dsn::THREAD_POOL_DEFAULT)
-
 DEFINE_TASK_CODE(LPC_PEGASUS_SERVER_DELAY, TASK_PRIORITY_COMMON, ::dsn::THREAD_POOL_DEFAULT)
 
 DEFINE_TASK_CODE(LPC_UPDATING_ROCKSDB_SSTSIZE, TASK_PRIORITY_COMMON, THREAD_POOL_REPLICATION_LONG)
@@ -496,7 +490,7 @@ void pegasus_server_impl::gc_checkpoints()
 
 int pegasus_server_impl::on_batched_write_requests(int64_t decree,
                                                    uint64_t timestamp,
-                                                   dsn_message_t *requests,
+                                                   dsn::message_ex **requests,
                                                    int count)
 {
     dassert(_is_open, "");
@@ -1281,8 +1275,8 @@ void pegasus_server_impl::on_scan(const ::dsn::apps::scan_request &request,
         bool stop_inclusive = context->stop_inclusive;
         ::dsn::apps::filter_type::type hash_key_filter_type = context->hash_key_filter_type;
         const ::dsn::blob &hash_key_filter_pattern = context->hash_key_filter_pattern;
-        ::dsn::apps::filter_type::type sort_key_filter_type = context->hash_key_filter_type;
-        const ::dsn::blob &sort_key_filter_pattern = context->hash_key_filter_pattern;
+        ::dsn::apps::filter_type::type sort_key_filter_type = context->sort_key_filter_type;
+        const ::dsn::blob &sort_key_filter_pattern = context->sort_key_filter_pattern;
         bool no_value = context->no_value;
         bool need_check_hash = context->need_check_hash;
         bool complete = false;
@@ -1588,16 +1582,26 @@ void pegasus_server_impl::cancel_background_work(bool wait)
     delete _db;
     _db = nullptr;
 
+    std::deque<int64_t> reserved_checkpoints;
     {
         ::dsn::utils::auto_lock<::dsn::utils::ex_lock_nr> l(_checkpoints_lock);
-        _checkpoints.clear();
+        std::swap(reserved_checkpoints, _checkpoints);
         set_last_durable_decree(0);
     }
 
     if (clear_state) {
-        if (!::dsn::utils::filesystem::remove_path(data_dir())) {
-            derror(
-                "%s: clear directory %s failed when stop app", replica_name(), data_dir().c_str());
+        // when clean the data dir, please clean the checkpoints first.
+        // otherwise, if the "rdb" is removed but the checkpoints remains,
+        // the storage engine can't be opened again
+        for (auto iter = reserved_checkpoints.begin(); iter != reserved_checkpoints.end(); ++iter) {
+            std::string chkpt_path =
+                dsn::utils::filesystem::path_combine(data_dir(), chkpt_get_dir_name(*iter));
+            if (!dsn::utils::filesystem::remove_path(chkpt_path)) {
+                derror("%s: rmdir %s failed when stop app", replica_name(), chkpt_path.c_str());
+            }
+        }
+        if (!dsn::utils::filesystem::remove_path(data_dir())) {
+            derror("%s: rmdir %s failed when stop app", replica_name(), data_dir().c_str());
             return ::dsn::ERR_FILE_OPERATION_FAILED;
         }
         _pfc_sst_count->set(0);
@@ -2033,44 +2037,30 @@ pegasus_server_impl::storage_apply_checkpoint(chkpt_apply_mode mode,
     return ::dsn::ERR_OK;
 }
 
-bool pegasus_server_impl::is_filter_type_supported(::dsn::apps::filter_type::type filter_type)
-{
-    return filter_type >= ::dsn::apps::filter_type::FT_NO_FILTER &&
-           filter_type <= ::dsn::apps::filter_type::FT_MATCH_POSTFIX;
-}
-
 bool pegasus_server_impl::validate_filter(::dsn::apps::filter_type::type filter_type,
                                           const ::dsn::blob &filter_pattern,
                                           const ::dsn::blob &value)
 {
-    if (filter_type == ::dsn::apps::filter_type::FT_NO_FILTER || filter_pattern.length() == 0)
-        return true;
-    if (value.length() < filter_pattern.length())
-        return false;
     switch (filter_type) {
-    case ::dsn::apps::filter_type::FT_MATCH_ANYWHERE: {
-        // brute force search
-        // TODO: improve it according to
-        //   http://old.blog.phusion.nl/2010/12/06/efficient-substring-searching/
-        const char *a1 = value.data();
-        int l1 = value.length();
-        const char *a2 = filter_pattern.data();
-        int l2 = filter_pattern.length();
-        for (int i = 0; i <= l1 - l2; ++i) {
-            int j = 0;
-            while (j < l2 && a1[i + j] == a2[j])
-                ++j;
-            if (j == l2)
-                return true;
-        }
-        return false;
-    }
+    case ::dsn::apps::filter_type::FT_NO_FILTER:
+        return true;
+    case ::dsn::apps::filter_type::FT_MATCH_ANYWHERE:
     case ::dsn::apps::filter_type::FT_MATCH_PREFIX:
-        return (memcmp(value.data(), filter_pattern.data(), filter_pattern.length()) == 0);
-    case ::dsn::apps::filter_type::FT_MATCH_POSTFIX:
-        return (memcmp(value.data() + value.length() - filter_pattern.length(),
-                       filter_pattern.data(),
-                       filter_pattern.length()) == 0);
+    case ::dsn::apps::filter_type::FT_MATCH_POSTFIX: {
+        if (filter_pattern.length() == 0)
+            return true;
+        if (value.length() < filter_pattern.length())
+            return false;
+        if (filter_type == ::dsn::apps::filter_type::FT_MATCH_ANYWHERE) {
+            return dsn::string_view(value).find(filter_pattern) != dsn::string_view::npos;
+        } else if (filter_type == ::dsn::apps::filter_type::FT_MATCH_PREFIX) {
+            return ::memcmp(value.data(), filter_pattern.data(), filter_pattern.length()) == 0;
+        } else { // filter_type == ::dsn::apps::filter_type::FT_MATCH_POSTFIX
+            return ::memcmp(value.data() + value.length() - filter_pattern.length(),
+                            filter_pattern.data(),
+                            filter_pattern.length()) == 0;
+        }
+    }
     default:
         dassert(false, "unsupported filter type: %d", filter_type);
     }
