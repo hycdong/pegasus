@@ -41,7 +41,9 @@ public:
         // _partition_version < 0 indicate current partition not in service
         // if current partition not served this key, return true immediately
         if (_partition_version > 0 && _partition_id <= _partition_version) {
-            if(key.size() >= 2){
+            if(key.size() < 2){
+                return true;
+            }else{
                 uint32_t hash_num = (uint32_t)pegasus_key_hash(key);
                 if ((hash_num & _partition_version) != _partition_id) {
                     ddebug("this value will be removed, hash_num is %d, _partition_version=%d, _partition_id=%d",
