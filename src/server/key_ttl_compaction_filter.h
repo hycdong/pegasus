@@ -46,7 +46,7 @@ public:
             }else{
                 uint32_t hash_num = (uint32_t)pegasus_key_hash(key);
                 if ((hash_num & _partition_version) != _partition_id) {
-                    ddebug("this value will be removed, hash_num is %d, _partition_version=%d, _partition_id=%d",
+                    dinfo("this value will be removed, hash_num is %d, _partition_version=%d, _partition_id=%d",
                            hash_num,
                            _partition_version.load(),
                            _partition_id);
