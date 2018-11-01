@@ -41,8 +41,8 @@ public:
                 req.key = key;
                 req.value.assign("value", 0, 5);
 
-                int put_rpc_cnt = dsn_random32(1, 10);
-                int remove_rpc_cnt = dsn_random32(1, 10);
+                int put_rpc_cnt = dsn::rand::next_u32(1, 10);
+                int remove_rpc_cnt = dsn::rand::next_u32(1, 10);
                 int total_rpc_cnt = put_rpc_cnt + remove_rpc_cnt;
                 auto writes = new dsn::message_ex *[total_rpc_cnt];
                 for (int i = 0; i < put_rpc_cnt; i++) {
@@ -52,9 +52,6 @@ public:
                     writes[i] = pegasus::create_remove_request(key);
                 }
                 auto cleanup = dsn::defer([=]() {
-                    for (int i = 0; i < total_rpc_cnt; i++) {
-                        writes[i]->release_ref();
-                    }
                     delete[] writes;
                 });
 

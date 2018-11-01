@@ -20,7 +20,7 @@
 #include <dsn/dist/replication/mutation_log_tool.h>
 
 #include <rrdb/rrdb.code.definition.h>
-#include <rrdb/rrdb.types.h>
+#include <rrdb/rrdb_types.h>
 #include <pegasus/version.h>
 #include <pegasus/git_commit.h>
 #include <pegasus/error.h>
@@ -542,6 +542,20 @@ inline bool use_app_as_current(command_executor *e, shell_context *sc, arguments
     } else {
         return false;
     }
+}
+
+extern void check_in_cluster(std::string cluster_name);
+
+inline bool cc_command(command_executor *e, shell_context *sc, arguments args)
+{
+    if (args.argc == 2) {
+        std::string cluster_name = args.argv[1];
+        if (!cluster_name.empty()) {
+            check_in_cluster(cluster_name);
+            return true;
+        }
+    }
+    return false;
 }
 
 inline bool process_escape_all(command_executor *e, shell_context *sc, arguments args)
