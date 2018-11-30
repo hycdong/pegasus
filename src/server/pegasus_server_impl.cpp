@@ -1548,7 +1548,12 @@ void pegasus_server_impl::on_clear_scanner(const int64_t &args) { _context_cache
 
 void pegasus_server_impl::cancel_background_work(bool wait)
 {
-    dassert(_db != nullptr, "");
+    //TODO(hyc): consider
+//    dassert(_db != nullptr, "");
+    if(_db == nullptr){
+        dwarn("db is nullptr");
+        return;
+    }
     rocksdb::CancelAllBackgroundWork(_db, wait);
 }
 
