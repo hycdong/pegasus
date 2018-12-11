@@ -484,7 +484,9 @@ get_app_stat(shell_context *sc, const std::string &app_name, std::vector<row_dat
                 return true;
             }
             dassert(app_id == app.app_id, "%d VS %d", app_id, app.app_id);
-            dassert(partition_count == app.partition_count,
+            // partition split may cause partition count changed
+            dassert(partition_count == app.partition_count ||
+                        partition_count == app.partition_count * 2,
                     "%d VS %d",
                     partition_count,
                     app.partition_count);
