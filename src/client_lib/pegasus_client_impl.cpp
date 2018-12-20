@@ -1192,7 +1192,8 @@ int pegasus_client_impl::get_scanner(const std::string &hash_key,
     if (c < 0 || (c == 0 && o.start_inclusive && o.stop_inclusive)) {
         v.push_back(pegasus_key_hash(start));
     }
-    scanner = new pegasus_scanner_impl(_client, std::move(v), o, start, stop, false);
+    //TODO(hyc): change to true, consider
+    scanner = new pegasus_scanner_impl(_client, std::move(v), o, start, stop, true);
 
     return PERR_OK;
 }
