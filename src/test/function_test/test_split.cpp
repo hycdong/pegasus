@@ -10,22 +10,49 @@
 
 using namespace dsn::replication;
 
-TEST(split, basic_split)
+int partition_count = 4;
+extern replication_ddl_client *ddl_client;
+
+static void create_table(std::string table_name, int partition_count)
+{
+    std::cerr << "create app " << table_name << std::endl;
+    dsn::error_code error =
+        ddl_client->create_app(table_name, "pegasus", partition_count, 3, {}, false);
+    ASSERT_EQ(dsn::ERR_OK, error);
+}
+
+static void drop_table(std::string table_name)
+{
+    std::cerr << "drop app " << table_name << std::endl;
+    dsn::error_code error = ddl_client->drop_app(table_name, 1);
+    ASSERT_EQ(dsn::ERR_OK, error);
+}
+
+class split : public testing::Test
+{
+public:
+    static void SetUpTestCase(){
+        ddebug("SetUp...");
+        std::vector<dsn::rpc_address> meta_list;
+        replica_helper::load_meta_servers(meta_list, "uri-resolver.dsn://mycluster", "arguments");
+        ddl_client = new replication_ddl_client(meta_list);
+
+        create_table("split_table", partition_count);
+        create_table("scan_split", partition_count);
+    }
+
+    static void TearDownTestCase(){
+        ddebug("TearDown...");
+        drop_table("split_table");
+        drop_table("scan_split");
+    }
+};
+
+TEST_F(split, basic_split)
 {
     static std::map<std::string, std::map<std::string, std::string>> expected;
     const std::string split_table = "split_table";
-    const int partition_count = 4;
-
-    std::vector<dsn::rpc_address> meta_list;
-    replica_helper::load_meta_servers(meta_list, "uri-resolver.dsn://mycluster", "arguments");
-    replication_ddl_client *ddl_client = new replication_ddl_client(meta_list);
-
-    // first create table
-    std::cerr << "create app " << split_table << std::endl;
-    dsn::error_code error =
-        ddl_client->create_app(split_table, "pegasus", partition_count, 3, {}, false);
-    ASSERT_EQ(dsn::ERR_OK, error);
-
+    dsn::error_code error;
     pegasus::pegasus_client *pg_client =
         pegasus::pegasus_client_factory::get_client("mycluster", split_table.c_str());
 
@@ -62,7 +89,7 @@ TEST(split, basic_split)
         std::vector<dsn::partition_configuration> partitions;
         error = ddl_client->list_app(split_table, app_id, partition, partitions);
         ASSERT_EQ(dsn::ERR_OK, error);
-        ASSERT_EQ(partition, partition_count*2);
+        ASSERT_EQ(partition, partition_count * 2);
 
         completed = true;
         for(int i = 0; i < partition; ++i){
@@ -115,22 +142,12 @@ TEST(split, basic_split)
     }
 }
 
-TEST(split, split_scan)
+TEST_F(split, split_scan)
 {
     static std::map<std::string, std::map<std::string, std::string>> expected;
     static std::map<std::string, std::map<std::string, std::string>> actual;
-    const std::string split_table = "split_scan";
-    const int partition_count = 4;
-
-    std::vector<dsn::rpc_address> meta_list;
-    replica_helper::load_meta_servers(meta_list, "uri-resolver.dsn://mycluster", "arguments");
-    replication_ddl_client *ddl_client = new replication_ddl_client(meta_list);
-
-    // first create table
-    std::cerr << "create app " << split_table << std::endl;
-    dsn::error_code error =
-        ddl_client->create_app(split_table, "pegasus", partition_count, 3, {}, false);
-    ASSERT_EQ(dsn::ERR_OK, error);
+    const std::string split_table = "scan_split";
+    dsn::error_code error;
 
     pegasus::pegasus_client *pg_client =
         pegasus::pegasus_client_factory::get_client("mycluster", split_table.c_str());
@@ -157,7 +174,7 @@ TEST(split, split_scan)
         std::vector<dsn::partition_configuration> partitions;
         error = ddl_client->list_app(split_table, app_id, partition, partitions);
         ASSERT_EQ(dsn::ERR_OK, error);
-        ASSERT_EQ(partition, partition_count*2);
+        ASSERT_EQ(partition, partition_count * 2);
 
         completed = true;
         for(int i = 0; i < partition; ++i){
