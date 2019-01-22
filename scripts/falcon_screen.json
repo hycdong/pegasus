@@ -691,6 +691,25 @@
       "timespan": 86400
     },
     {
+      "title": "Partition split相关统计",
+      "endpoints": ["cluster=${cluster.name} job=replica service=pegasus"],
+      "counters": [
+          "replica*eon.replica_stub*replicas.splitting.count/cluster=${cluster.name},job=replica,port=${replica.port},service=pegasus",
+          "replica*eon.replica_stub*replicas.splitting.max.copy.file.size/cluster=${cluster.name},job=replica,port=${replica.port},service=pegasus",
+          "replica*eon.replica_stub*replicas.splitting.max.duration.time(ms)/cluster=${cluster.name},job=replica,port=${replica.port},service=pegasus",
+          "replica*eon.replica_stub*replicas.splitting.max.async.learn.time(ms)/cluster=${cluster.name},job=replica,port=${replica.port},service=pegasus",
+          "replica*eon.replica_stub*replicas.splitting.recent.copy.mutation.size/cluster=${cluster.name},job=replica,port=${replica.port},service=pegasus",
+          "replica*eon.replica_stub*replicas.splitting.recent.copy.file.count/cluster=${cluster.name},job=replica,port=${replica.port},service=pegasus",
+          "replica*eon.replica_stub*replicas.splitting.recent.copy.file.size/cluster=${cluster.name},job=replica,port=${replica.port},service=pegasus",
+          "replica*eon.replica_stub*replicas.splitting.recent.split.fail.count/cluster=${cluster.name},job=replica,port=${replica.port},service=pegasus",
+          "replica*eon.replica_stub*replicas.splitting.recent.split.succ.count/cluster=${cluster.name},job=replica,port=${replica.port},service=pegasus",
+          "replica*eon.replica_stub*replicas.splitting.recent.start.count/cluster=${cluster.name},job=replica,port=${replica.port},service=pegasus"
+      ],
+      "graph_type": "a",
+      "method": "",
+      "timespan": 86400
+    },
+    {
       "title": "【${for.each.table}】单表QPS",
       "endpoints": ["cluster=${cluster.name} job=collector service=pegasus"],
       "counters": [
