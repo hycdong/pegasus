@@ -8,7 +8,10 @@
 
 #include <dsn/dist/replication/replication_ddl_client.h>
 
+#include "base/pegasus_const.h"
+
 using namespace dsn::replication;
+using namespace pegasus;
 
 int partition_count = 4;
 extern replication_ddl_client *ddl_client;
@@ -34,7 +37,7 @@ public:
     static void SetUpTestCase(){
         ddebug("SetUp...");
         std::vector<dsn::rpc_address> meta_list;
-        replica_helper::load_meta_servers(meta_list, "uri-resolver.dsn://mycluster", "arguments");
+        replica_helper::load_meta_servers(meta_list, PEGASUS_CLUSTER_SECTION_NAME.c_str(), "mycluster");
         ddl_client = new replication_ddl_client(meta_list);
 
         create_table("split_table", partition_count);
