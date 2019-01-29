@@ -272,7 +272,7 @@ scount=0
 while true
 do
     if [ ${scount} -gt 60 ]; then
-        if [ ${unwritable} -gt 0 || ${unreadable} -gt 0 ]; then
+        if [[ ${unwritable} -gt 0 ]] || [[ ${unreadable} -gt 0 ]]; then
             echo
             echo "${app_name} still has ${unwritable} write unhealthy, ${unreadable} read unhealthy partition."
             echo "WARNING: please check partition split result."
@@ -281,6 +281,7 @@ do
         else
             echo
             echo "WARNING: partition split finished, but still has ${total_unhealthy} unhealthy partition, table ${app_name} still learn"
+            break
         fi
     fi
 
