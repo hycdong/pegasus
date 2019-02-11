@@ -175,7 +175,7 @@ done<${ls_log_file}
 
 # check app partition healthy
 full_healthy_count=`echo "app ${app_name} -d" | ./run.sh shell --cluster ${cluster} | grep "fully_healthy_partition_count" | awk '{print $3}'`
-if [ ${full_healthy_count} != ${original_pc} ]; then
+if [ ${full_healthy_count} -ne ${original_pc} ]; then
     echo "ERROR: app ${app_name} unhealthy partition count is $((original_pc - full_healthy_count)), please query later"
     exit 1
 fi
