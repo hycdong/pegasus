@@ -271,10 +271,11 @@ echo "Wait for 10 minutes to wait all partition healthy..."
 scount=0
 while true
 do
+    current_time=`date +%s`
     if [ ${scount} -gt 60 ]; then
-        if [[ ${unwritable} -gt 0 ]] || [[ ${unreadable} -gt 0 ]]; then
+        if [[ ${unwritable} -gt 0 ]] || [[ ${unreadable} -gt 0 ]]; then            
             echo
-            echo "${app_name} still has ${unwritable} write unhealthy, ${unreadable} read unhealthy partition."
+            echo "`date -d @${current_time} +"%Y-%m-%d %H:%M:%S"` ${app_name} still has ${unwritable} write unhealthy, ${unreadable} read unhealthy partition."
             echo "WARNING: please check partition split result."
             rm -f /tmp/$UID.$PID.pegasus.* &>/dev/null
             exit 0
@@ -296,7 +297,7 @@ do
     if [ "${total_healthy}" == "${partition_count}" ]; then
         break
     else
-        echo "${app_name} still has ${total_unhealthy} unhealthy, ${unwritable} write unhealthy, ${unreadable} read unhealthy partition."
+        echo "`date -d @${current_time} +"%Y-%m-%d %H:%M:%S"` ${app_name} still has ${total_unhealthy} unhealthy, ${unwritable} write unhealthy, ${unreadable} read unhealthy partition."
     fi
 
     sleep 10
