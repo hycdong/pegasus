@@ -13,6 +13,7 @@
 #include <rocksdb/db.h>
 #include <rocksdb/sst_dump_tool.h>
 #include <dsn/utility/filesystem.h>
+#include <dsn/utility/output_utils.h>
 #include <dsn/utility/string_conv.h>
 #include <dsn/utility/string_view.h>
 #include <dsn/dist/cli/cli.client.h>
@@ -31,6 +32,7 @@
 #include "args.h"
 
 using namespace dsn::replication;
+using tp_alignment = ::dsn::utils::table_printer::alignment;
 
 inline bool version(command_executor *e, shell_context *sc, arguments args)
 {
@@ -82,24 +84,25 @@ inline bool query_app(command_executor *e, shell_context *sc, arguments args)
         }
     }
 
+    dsn::utils::table_printer tp;
     if (!(app_name.empty() && out_file.empty())) {
         std::cout << "[Parameters]" << std::endl;
         if (!app_name.empty())
-            std::cout << "app_name: " << app_name << std::endl;
+            tp.add_row_name_and_data("app_name", app_name);
         if (!out_file.empty())
-            std::cout << "out_file: " << out_file << std::endl;
+            tp.add_row_name_and_data("out_file", out_file);
     }
-    if (detailed)
-        std::cout << "detailed: true" << std::endl;
-    else
-        std::cout << "detailed: false" << std::endl;
+    tp.add_row_name_and_data("detailed", detailed);
+    tp.output(std::cout, ": ");
+
     std::cout << std::endl << "[Result]" << std::endl;
 
     if (app_name.empty()) {
         std::cout << "ERROR: null app name" << std::endl;
         return false;
     }
-    ::dsn::error_code err = sc->ddl_client->list_app(app_name, detailed, out_file);
+    ::dsn::error_code err =
+        sc->ddl_client->list_app(app_name, detailed, out_file); // TODO resolve ip
     if (err == ::dsn::ERR_OK)
         std::cout << "list app " << app_name << " succeed" << std::endl;
     else
@@ -161,9 +164,37 @@ inline bool ls_apps(command_executor *e, shell_context *sc, arguments args)
     return true;
 }
 
+struct list_nodes_helper
+{
+    std::string node_name;
+    std::string node_status;
+    int primary_count;
+    int secondary_count;
+    int64_t memused_res_mb;
+    int64_t block_cache_bytes;
+    int64_t mem_tbl_bytes;
+    int64_t mem_idx_bytes;
+    int64_t disk_available_total_ratio;
+    int64_t disk_available_min_ratio;
+    list_nodes_helper(const std::string &n, const std::string &s)
+        : node_name(n),
+          node_status(s),
+          primary_count(0),
+          secondary_count(0),
+          memused_res_mb(0),
+          block_cache_bytes(0),
+          mem_tbl_bytes(0),
+          mem_idx_bytes(0),
+          disk_available_total_ratio(0),
+          disk_available_min_ratio(0)
+    {
+    }
+};
 inline bool ls_nodes(command_executor *e, shell_context *sc, arguments args)
 {
     static struct option long_options[] = {{"detailed", no_argument, 0, 'd'},
+                                           {"resolve_ip", no_argument, 0, 'r'},
+                                           {"resource_usage", no_argument, 0, 'u'},
                                            {"status", required_argument, 0, 's'},
                                            {"output", required_argument, 0, 'o'},
                                            {0, 0, 0, 0}};
@@ -171,16 +202,24 @@ inline bool ls_nodes(command_executor *e, shell_context *sc, arguments args)
     std::string status;
     std::string output_file;
     bool detailed = false;
+    bool resolve_ip = false;
+    bool resource_usage = false;
     optind = 0;
     while (true) {
         int option_index = 0;
         int c;
-        c = getopt_long(args.argc, args.argv, "ds:o:", long_options, &option_index);
+        c = getopt_long(args.argc, args.argv, "drus:o:", long_options, &option_index);
         if (c == -1)
             break;
         switch (c) {
         case 'd':
             detailed = true;
+            break;
+        case 'r':
+            resolve_ip = true;
+            break;
+        case 'u':
+            resource_usage = true;
             break;
         case 's':
             status = optarg;
@@ -195,12 +234,14 @@ inline bool ls_nodes(command_executor *e, shell_context *sc, arguments args)
 
     if (!(status.empty() && output_file.empty())) {
         std::cout << "[Parameters]" << std::endl;
+        dsn::utils::table_printer tp;
         if (!status.empty())
-            std::cout << "status: " << status << std::endl;
+            tp.add_row_name_and_data("status", status);
         if (!output_file.empty())
-            std::cout << "out_file: " << output_file << std::endl;
-        std::cout << std::endl << "[Result]" << std::endl;
+            tp.add_row_name_and_data("out_file", output_file);
+        tp.output(std::cout, ": ");
     }
+    std::cout << std::endl << "[Result]" << std::endl;
 
     ::dsn::replication::node_status::type s = ::dsn::replication::node_status::NS_INVALID;
     if (!status.empty() && status != "all") {
@@ -212,9 +253,184 @@ inline bool ls_nodes(command_executor *e, shell_context *sc, arguments args)
                       status.c_str());
     }
 
-    ::dsn::error_code err = sc->ddl_client->list_nodes(s, detailed, output_file);
-    if (err != ::dsn::ERR_OK)
-        std::cout << "list nodes failed, error=" << err.to_string() << std::endl;
+    std::map<dsn::rpc_address, dsn::replication::node_status::type> nodes;
+    auto r = sc->ddl_client->list_nodes(s, nodes);
+    if (r != dsn::ERR_OK) {
+        std::cout << "list nodes failed, error=" << r.to_string() << std::endl;
+        return true;
+    }
+
+    std::map<dsn::rpc_address, list_nodes_helper> tmp_map;
+    int alive_node_count = 0;
+    for (auto &kv : nodes) {
+        if (kv.second == dsn::replication::node_status::NS_ALIVE)
+            alive_node_count++;
+        std::string status_str = dsn::enum_to_string(kv.second);
+        status_str = status_str.substr(status_str.find("NS_") + 3);
+        std::string node_name = kv.first.to_std_string();
+        if (resolve_ip) {
+            // TODO: put hostname_from_ip_port into common utils
+            node_name = sc->ddl_client->hostname_from_ip_port(node_name.c_str());
+        }
+        tmp_map.emplace(kv.first, list_nodes_helper(node_name, status_str));
+    }
+
+    if (detailed) {
+        std::vector<::dsn::app_info> apps;
+        r = sc->ddl_client->list_apps(dsn::app_status::AS_AVAILABLE, apps);
+        if (r != dsn::ERR_OK) {
+            std::cout << "list apps failed, error=" << r.to_string() << std::endl;
+            return true;
+        }
+
+        for (auto &app : apps) {
+            int32_t app_id;
+            int32_t partition_count;
+            std::vector<dsn::partition_configuration> partitions;
+            r = sc->ddl_client->list_app(app.app_name, app_id, partition_count, partitions);
+            if (r != dsn::ERR_OK) {
+                std::cout << "list app " << app.app_name << " failed, error=" << r.to_string()
+                          << std::endl;
+                return true;
+            }
+
+            for (const dsn::partition_configuration &p : partitions) {
+                if (!p.primary.is_invalid()) {
+                    auto find = tmp_map.find(p.primary);
+                    if (find != tmp_map.end()) {
+                        find->second.primary_count++;
+                    }
+                }
+                for (const dsn::rpc_address &addr : p.secondaries) {
+                    auto find = tmp_map.find(addr);
+                    if (find != tmp_map.end()) {
+                        find->second.secondary_count++;
+                    }
+                }
+            }
+        }
+    }
+
+    if (resource_usage) {
+        std::vector<node_desc> nodes;
+        if (!fill_nodes(sc, "replica-server", nodes)) {
+            derror("get replica server node list failed");
+            return true;
+        }
+
+        ::dsn::command command;
+        command.cmd = "perf-counters";
+        command.arguments.push_back(".*memused.res(MB)");
+        command.arguments.push_back(".*rdb.block_cache.memory_usage");
+        command.arguments.push_back(".*disk.available.total.ratio");
+        command.arguments.push_back(".*disk.available.min.ratio");
+        command.arguments.push_back(".*@.*");
+        std::vector<std::pair<bool, std::string>> results;
+        call_remote_command(sc, nodes, command, results);
+
+        for (int i = 0; i < nodes.size(); ++i) {
+            dsn::rpc_address node_addr = nodes[i].address;
+            auto tmp_it = tmp_map.find(node_addr);
+            if (tmp_it == tmp_map.end())
+                continue;
+            if (!results[i].first) {
+                derror("query perf counter info from node %s failed", node_addr.to_string());
+                return true;
+            }
+            dsn::perf_counter_info info;
+            dsn::blob bb(results[i].second.data(), 0, results[i].second.size());
+            if (!dsn::json::json_forwarder<dsn::perf_counter_info>::decode(bb, info)) {
+                derror("decode perf counter info from node %s failed, result = %s",
+                       node_addr.to_string(),
+                       results[i].second.c_str());
+                return true;
+            }
+            if (info.result != "OK") {
+                derror("query perf counter info from node %s returns error, error = %s",
+                       node_addr.to_string(),
+                       info.result.c_str());
+                return true;
+            }
+            list_nodes_helper &h = tmp_it->second;
+            for (dsn::perf_counter_metric &m : info.counters) {
+                if (m.name == "replica*server*memused.res(MB)")
+                    h.memused_res_mb = m.value;
+                else if (m.name == "replica*app.pegasus*rdb.block_cache.memory_usage")
+                    h.block_cache_bytes = m.value;
+                else if (m.name == "replica*eon.replica_stub*disk.available.total.ratio")
+                    h.disk_available_total_ratio = m.value;
+                else if (m.name == "replica*eon.replica_stub*disk.available.min.ratio")
+                    h.disk_available_min_ratio = m.value;
+                else {
+                    int32_t app_id_x, partition_index_x;
+                    std::string counter_name;
+                    bool parse_ret = parse_app_pegasus_perf_counter_name(
+                        m.name, app_id_x, partition_index_x, counter_name);
+                    dassert(parse_ret, "name = %s", m.name.c_str());
+                    if (counter_name == "rdb.memtable.memory_usage")
+                        h.mem_tbl_bytes += m.value;
+                    else if (counter_name == "rdb.index_and_filter_blocks.memory_usage")
+                        h.mem_idx_bytes += m.value;
+                }
+            }
+        }
+    }
+
+    // print configuration_list_nodes_response
+    std::streambuf *buf;
+    std::ofstream of;
+
+    if (!output_file.empty()) {
+        of.open(output_file);
+        buf = of.rdbuf();
+    } else {
+        buf = std::cout.rdbuf();
+    }
+    std::ostream out(buf);
+
+    dsn::utils::table_printer tp;
+    tp.add_title("address");
+    tp.add_column("status");
+    if (detailed) {
+        tp.add_column("replica_count", tp_alignment::kRight);
+        tp.add_column("primary_count", tp_alignment::kRight);
+        tp.add_column("secondary_count", tp_alignment::kRight);
+    }
+    if (resource_usage) {
+        tp.add_column("memused_res_mb", tp_alignment::kRight);
+        tp.add_column("block_cache_mb", tp_alignment::kRight);
+        tp.add_column("mem_tbl_mb", tp_alignment::kRight);
+        tp.add_column("mem_idx_mb", tp_alignment::kRight);
+        tp.add_column("disk_avl_total_ratio", tp_alignment::kRight);
+        tp.add_column("disk_avl_min_ratio", tp_alignment::kRight);
+    }
+    for (auto &kv : tmp_map) {
+        tp.add_row(kv.second.node_name);
+        tp.append_data(kv.second.node_status);
+        if (detailed) {
+            tp.append_data(kv.second.primary_count + kv.second.secondary_count);
+            tp.append_data(kv.second.primary_count);
+            tp.append_data(kv.second.secondary_count);
+        }
+        if (resource_usage) {
+            tp.append_data(kv.second.memused_res_mb);
+            tp.append_data(kv.second.block_cache_bytes / (1 << 20U));
+            tp.append_data(kv.second.mem_tbl_bytes / (1 << 20U));
+            tp.append_data(kv.second.mem_idx_bytes / (1 << 20U));
+            tp.append_data(kv.second.disk_available_total_ratio);
+            tp.append_data(kv.second.disk_available_min_ratio);
+        }
+    }
+    tp.output(out);
+    out << std::endl;
+
+    dsn::utils::table_printer tp_count;
+    tp_count.add_row_name_and_data("total_node_count", nodes.size());
+    tp_count.add_row_name_and_data("alive_node_count", alive_node_count);
+    tp_count.add_row_name_and_data("unalive_node_count", nodes.size() - alive_node_count);
+    tp_count.output(out, ": ");
+    out << std::endl;
+
     return true;
 }
 
@@ -616,9 +832,8 @@ inline bool calculate_hash_value(command_executor *e, shell_context *sc, argumen
     pegasus::pegasus_generate_key(key, hash_key, sort_key);
     uint64_t key_hash = pegasus::pegasus_key_hash(key);
 
-    int width = strlen("partition_index");
-    std::cout << std::setw(width) << std::left << "key_hash"
-              << " : " << key_hash << std::endl;
+    ::dsn::utils::table_printer tp;
+    tp.add_row_name_and_data("key_hash", key_hash);
 
     if (!sc->current_app_name.empty()) {
         int32_t app_id;
@@ -632,28 +847,24 @@ inline bool calculate_hash_value(command_executor *e, shell_context *sc, argumen
             return true;
         }
         uint64_t partition_index = key_hash % (uint64_t)partition_count;
-        std::cout << std::setw(width) << std::left << "app_name"
-                  << " : " << sc->current_app_name << std::endl;
-        std::cout << std::setw(width) << std::left << "app_id"
-                  << " : " << app_id << std::endl;
-        std::cout << std::setw(width) << std::left << "partition_count"
-                  << " : " << partition_count << std::endl;
-        std::cout << std::setw(width) << std::left << "partition_index"
-                  << " : " << partition_index << std::endl;
+        tp.add_row_name_and_data("app_name", sc->current_app_name);
+        tp.add_row_name_and_data("app_id", app_id);
+        tp.add_row_name_and_data("partition_count", partition_count);
+        tp.add_row_name_and_data("partition_index", partition_index);
         if (partitions.size() > partition_index) {
             ::dsn::partition_configuration &pc = partitions[partition_index];
-            std::cout << std::setw(width) << std::left << "primary"
-                      << " : " << pc.primary.to_string() << std::endl;
+            tp.add_row_name_and_data("primary", pc.primary.to_string());
+
             std::ostringstream oss;
             for (int i = 0; i < pc.secondaries.size(); ++i) {
                 if (i != 0)
                     oss << ",";
                 oss << pc.secondaries[i].to_string();
             }
-            std::cout << std::setw(width) << std::left << "secondaries"
-                      << " : " << oss.str() << std::endl;
+            tp.add_row_name_and_data("secondaries", oss.str());
         }
     }
+    tp.output(std::cout, ": ");
     return true;
 }
 
@@ -2157,9 +2368,17 @@ inline bool copy_data(command_executor *e, shell_context *sc, arguments args)
 {
     static struct option long_options[] = {{"target_cluster_name", required_argument, 0, 'c'},
                                            {"target_app_name", required_argument, 0, 'a'},
-                                           {"max_split_count", required_argument, 0, 's'},
+                                           {"partition", required_argument, 0, 'p'},
                                            {"max_batch_count", required_argument, 0, 'b'},
                                            {"timeout_ms", required_argument, 0, 't'},
+                                           {"hash_key_filter_type", required_argument, 0, 'h'},
+                                           {"hash_key_filter_pattern", required_argument, 0, 'x'},
+                                           {"sort_key_filter_type", required_argument, 0, 's'},
+                                           {"sort_key_filter_pattern", required_argument, 0, 'y'},
+                                           {"value_filter_type", required_argument, 0, 'v'},
+                                           {"value_filter_pattern", required_argument, 0, 'z'},
+                                           {"no_overwrite", no_argument, 0, 'n'},
+                                           {"no_value", no_argument, 0, 'i'},
                                            {"geo_data", no_argument, 0, 'g'},
                                            {0, 0, 0, 0}};
 
@@ -2167,15 +2386,24 @@ inline bool copy_data(command_executor *e, shell_context *sc, arguments args)
     std::string target_app_name;
     std::string target_geo_app_name;
     int max_split_count = 100000000;
+    int32_t partition = -1;
     int max_batch_count = 500;
     int timeout_ms = sc->timeout_ms;
     bool is_geo_data = false;
+    bool no_overwrite = false;
+    std::string hash_key_filter_type_name("no_filter");
+    std::string sort_key_filter_type_name("no_filter");
+    std::string value_filter_type_name("no_filter");
+    pegasus::pegasus_client::filter_type value_filter_type = pegasus::pegasus_client::FT_NO_FILTER;
+    std::string value_filter_pattern;
+    pegasus::pegasus_client::scan_options options;
 
     optind = 0;
     while (true) {
         int option_index = 0;
         int c;
-        c = getopt_long(args.argc, args.argv, "c:a:s:b:t:g", long_options, &option_index);
+        c = getopt_long(
+            args.argc, args.argv, "c:a:p:b:t:h:x:s:y:v:z:nig", long_options, &option_index);
         if (c == -1)
             break;
         switch (c) {
@@ -2186,23 +2414,75 @@ inline bool copy_data(command_executor *e, shell_context *sc, arguments args)
             target_app_name = optarg;
             target_geo_app_name = target_app_name + "_geo";
             break;
-        case 's':
-            if (!dsn::buf2int32(optarg, max_split_count)) {
-                fprintf(stderr, "parse %s as max_split_count failed\n", optarg);
+        case 'p':
+            if (!dsn::buf2int32(optarg, partition)) {
+                fprintf(stderr, "ERROR: parse %s as partition failed\n", optarg);
+                return false;
+            }
+            if (partition < 0) {
+                fprintf(stderr, "ERROR: partition should be greater than 0\n");
                 return false;
             }
             break;
         case 'b':
             if (!dsn::buf2int32(optarg, max_batch_count)) {
-                fprintf(stderr, "parse %s as max_batch_count failed\n", optarg);
+                fprintf(stderr, "ERROR: parse %s as max_batch_count failed\n", optarg);
                 return false;
             }
             break;
         case 't':
             if (!dsn::buf2int32(optarg, timeout_ms)) {
-                fprintf(stderr, "parse %s as timeout_ms failed\n", optarg);
+                fprintf(stderr, "ERROR: parse %s as timeout_ms failed\n", optarg);
                 return false;
             }
+            break;
+        case 'h':
+            options.hash_key_filter_type = (pegasus::pegasus_client::filter_type)type_from_string(
+                ::dsn::apps::_filter_type_VALUES_TO_NAMES,
+                std::string("ft_match_") + optarg,
+                ::dsn::apps::filter_type::FT_NO_FILTER);
+            if (options.hash_key_filter_type == pegasus::pegasus_client::FT_NO_FILTER) {
+                fprintf(stderr, "ERROR: invalid hash_key_filter_type param\n");
+                return false;
+            }
+            hash_key_filter_type_name = optarg;
+            break;
+        case 'x':
+            options.hash_key_filter_pattern = unescape_str(optarg);
+            break;
+        case 's':
+            options.sort_key_filter_type = (pegasus::pegasus_client::filter_type)type_from_string(
+                dsn::apps::_filter_type_VALUES_TO_NAMES,
+                std::string("ft_match_") + optarg,
+                ::dsn::apps::filter_type::FT_NO_FILTER);
+            if (options.sort_key_filter_type == pegasus::pegasus_client::FT_NO_FILTER) {
+                fprintf(stderr, "ERROR: invalid sort_key_filter_type param\n");
+                return false;
+            }
+            sort_key_filter_type_name = optarg;
+            break;
+        case 'y':
+            options.sort_key_filter_pattern = unescape_str(optarg);
+            break;
+        case 'v':
+            value_filter_type = (pegasus::pegasus_client::filter_type)type_from_string(
+                dsn::apps::_filter_type_VALUES_TO_NAMES,
+                std::string("ft_match_") + optarg,
+                ::dsn::apps::filter_type::FT_NO_FILTER);
+            if (value_filter_type == pegasus::pegasus_client::FT_NO_FILTER) {
+                fprintf(stderr, "ERROR: invalid value_filter_type param\n");
+                return false;
+            }
+            value_filter_type_name = optarg;
+            break;
+        case 'z':
+            value_filter_pattern = unescape_str(optarg);
+            break;
+        case 'n':
+            no_overwrite = true;
+            break;
+        case 'i':
+            options.no_value = true;
             break;
         case 'g':
             is_geo_data = true;
@@ -2244,6 +2524,28 @@ inline bool copy_data(command_executor *e, shell_context *sc, arguments args)
     if (is_geo_data) {
         fprintf(stderr, "INFO: target_geo_app_name = %s\n", target_geo_app_name.c_str());
     }
+    fprintf(stderr,
+            "INFO: partition = %s\n",
+            partition >= 0 ? boost::lexical_cast<std::string>(partition).c_str() : "all");
+    fprintf(stderr, "INFO: hash_key_filter_type = %s\n", hash_key_filter_type_name.c_str());
+    if (options.hash_key_filter_type != pegasus::pegasus_client::FT_NO_FILTER) {
+        fprintf(stderr,
+                "INFO: hash_key_filter_pattern = \"%s\"\n",
+                pegasus::utils::c_escape_string(options.hash_key_filter_pattern).c_str());
+    }
+    fprintf(stderr, "INFO: sort_key_filter_type = %s\n", sort_key_filter_type_name.c_str());
+    if (options.sort_key_filter_type != pegasus::pegasus_client::FT_NO_FILTER) {
+        fprintf(stderr,
+                "INFO: sort_key_filter_pattern = \"%s\"\n",
+                pegasus::utils::c_escape_string(options.sort_key_filter_pattern).c_str());
+    }
+    fprintf(stderr, "INFO: value_filter_type = %s\n", value_filter_type_name.c_str());
+    if (value_filter_type != pegasus::pegasus_client::FT_NO_FILTER) {
+        fprintf(stderr,
+                "INFO: value_filter_pattern = \"%s\"\n",
+                pegasus::utils::c_escape_string(value_filter_pattern).c_str());
+    }
+    fprintf(stderr, "INFO: no_value = %s\n", options.no_value ? "true" : "false");
     fprintf(stderr, "INFO: max_split_count = %d\n", max_split_count);
     fprintf(stderr, "INFO: max_batch_count = %d\n", max_batch_count);
     fprintf(stderr, "INFO: timeout_ms = %d\n", timeout_ms);
@@ -2279,7 +2581,6 @@ inline bool copy_data(command_executor *e, shell_context *sc, arguments args)
     }
 
     std::vector<pegasus::pegasus_client::pegasus_scanner *> scanners;
-    pegasus::pegasus_client::scan_options options;
     options.timeout_ms = timeout_ms;
     ret = sc->pg_client->get_unordered_scanners(max_split_count, options, scanners);
     if (ret != pegasus::PERR_OK) {
@@ -2289,8 +2590,21 @@ inline bool copy_data(command_executor *e, shell_context *sc, arguments args)
         delete target_geo_client;
         return true;
     }
+    fprintf(stderr,
+            "INFO: open source app scanner succeed, partition_count = %d\n",
+            (int)scanners.size());
+    if (partition != -1) {
+        if (partition >= scanners.size()) {
+            fprintf(stderr, "ERROR: invalid partition param: %d\n", partition);
+            delete target_geo_client;
+            return true;
+        }
+        std::vector<pegasus::pegasus_client::pegasus_scanner *> tmp_scanners;
+        tmp_scanners.push_back(scanners[partition]);
+        tmp_scanners.swap(scanners);
+    }
     int split_count = scanners.size();
-    fprintf(stderr, "INFO: open source app scanner succeed, split_count = %d\n", split_count);
+    fprintf(stderr, "INFO: prepare scanners succeed, split_count = %d\n", split_count);
 
     std::atomic_bool error_occurred(false);
     std::vector<scan_data_context *> contexts;
@@ -2303,6 +2617,9 @@ inline bool copy_data(command_executor *e, shell_context *sc, arguments args)
                                                            target_client,
                                                            target_geo_client,
                                                            &error_occurred);
+        context->set_value_filter(value_filter_type, value_filter_pattern);
+        if (no_overwrite)
+            context->set_no_overwrite();
         contexts.push_back(context);
         dsn::tasking::enqueue(LPC_SCAN_DATA, nullptr, std::bind(scan_data_next, context));
     }
@@ -3280,6 +3597,7 @@ inline bool remote_command(command_executor *e, shell_context *sc, arguments arg
 
     int succeed = 0;
     int failed = 0;
+    // TODO (yingchun) output is hard to read, need do some refactor
     for (int i = 0; i < node_list.size(); ++i) {
         node_desc &n = node_list[i];
         fprintf(stderr, "CALL [%s] [%s] ", n.desc.c_str(), n.address.to_string());
@@ -3362,17 +3680,17 @@ inline bool app_disk(command_executor *e, shell_context *sc, arguments args)
         }
     }
 
+    dsn::utils::table_printer tp_params;
     if (!(app_name.empty() && out_file.empty())) {
         std::cout << "[Parameters]" << std::endl;
         if (!app_name.empty())
-            std::cout << "app_name: " << app_name << std::endl;
+            tp_params.add_row_name_and_data("app_name", app_name);
         if (!out_file.empty())
-            std::cout << "out_file: " << out_file << std::endl;
+            tp_params.add_row_name_and_data("out_file", out_file);
     }
-    if (detailed)
-        std::cout << "detailed: true" << std::endl;
-    else
-        std::cout << "detailed: false" << std::endl;
+    tp_params.add_row_name_and_data("detailed", detailed);
+    tp_params.output(std::cout, ": ");
+
     std::cout << std::endl << "[Result]" << std::endl;
 
     if (app_name.empty()) {
@@ -3454,21 +3772,19 @@ inline bool app_disk(command_executor *e, shell_context *sc, arguments args)
     }
     std::ostream out(buf);
 
-    int width = strlen("disk_used_for_primary_replicas(MB)");
-    out << std::setw(width) << std::left << "app_name"
-        << " : " << app_name << std::endl;
-    out << std::setw(width) << std::left << "app_id"
-        << " : " << app_id << std::endl;
-    out << std::setw(width) << std::left << "partition_count"
-        << " : " << partition_count << std::endl;
-    out << std::setw(width) << std::left << "max_replica_count"
-        << " : " << max_replica_count << std::endl;
+    ::dsn::utils::table_printer tp_general;
+    tp_general.add_row_name_and_data("app_name", app_name);
+    tp_general.add_row_name_and_data("app_id", app_id);
+    tp_general.add_row_name_and_data("partition_count", partition_count);
+    tp_general.add_row_name_and_data("max_replica_count", max_replica_count);
+
+    ::dsn::utils::table_printer tp_details;
     if (detailed) {
-        out << std::setw(width) << std::left << "details"
-            << " : " << std::endl
-            << std::setw(10) << std::left << "pidx" << std::setw(10) << std::left << "ballot"
-            << std::setw(20) << std::left << "replica_count" << std::setw(40) << std::left
-            << "primary" << std::setw(80) << std::left << "secondaries" << std::endl;
+        tp_details.add_title("pidx");
+        tp_details.add_column("ballot");
+        tp_details.add_column("replica_count");
+        tp_details.add_column("primary");
+        tp_details.add_column("secondaries");
     }
     double disk_used_for_primary_replicas = 0;
     int primary_replicas_count = 0;
@@ -3575,26 +3891,33 @@ inline bool app_disk(command_executor *e, shell_context *sc, arguments args)
             oss << "]";
             secondary_str = oss.str();
         }
+
         if (detailed) {
-            out << std::setw(10) << std::left << p.pid.get_partition_index() << std::setw(10)
-                << std::left << p.ballot << std::setw(20) << std::left << replica_count_str
-                << std::setw(40) << std::left << primary_str << std::setw(80) << std::left
-                << secondary_str << std::endl;
+            tp_details.add_row(std::to_string(p.pid.get_partition_index()));
+            tp_details.append_data(p.ballot);
+            tp_details.append_data(replica_count_str);
+            tp_details.append_data(primary_str);
+            tp_details.append_data(secondary_str);
         }
     }
-    out << std::setw(width) << std::left << "disk_used_for_primary_replicas(MB)"
-        << " : " << disk_used_for_primary_replicas;
-    if (primary_replicas_count < partition_count)
+    tp_general.add_row_name_and_data("disk_used_for_primary_replicas(MB)",
+                                     disk_used_for_primary_replicas);
+    tp_general.add_row_name_and_data("disk_used_for_all_replicas(MB)", disk_used_for_all_replicas);
+    tp_general.output(out, ": ");
+    if (detailed) {
+        out << "details" << std::endl;
+        tp_details.output(out);
+    }
+    out << std::endl;
+
+    if (primary_replicas_count < partition_count) {
         out << " (" << (partition_count - primary_replicas_count) << "/" << partition_count
-            << " partitions not counted)";
-    out << std::endl;
-    out << std::setw(width) << std::left << "disk_used_for_all_replicas(MB)"
-        << " : " << disk_used_for_all_replicas;
-    if (all_replicas_count < partition_count * max_replica_count)
+            << " partitions not counted)" << std::endl;
+    }
+    if (all_replicas_count < partition_count * max_replica_count) {
         out << " (" << (partition_count * max_replica_count - all_replicas_count) << "/"
-            << (partition_count * max_replica_count) << " replicas not counted)";
-    out << std::endl;
-    out << std::endl;
+            << (partition_count * max_replica_count) << " replicas not counted)" << std::endl;
+    }
     std::cout << "list disk usage for app " << app_name << " succeed" << std::endl;
     return true;
 }
@@ -3660,7 +3983,6 @@ inline bool app_stat(command_executor *e, shell_context *sc, arguments args)
         sum.storage_count += row.storage_count;
         sum.rdb_block_cache_hit_count += row.rdb_block_cache_hit_count;
         sum.rdb_block_cache_total_count += row.rdb_block_cache_total_count;
-        sum.rdb_block_cache_mem_usage += row.rdb_block_cache_mem_usage;
         sum.rdb_index_and_filter_blocks_mem_usage += row.rdb_index_and_filter_blocks_mem_usage;
         sum.rdb_memtable_mem_usage += row.rdb_memtable_mem_usage;
     }
@@ -3676,28 +3998,29 @@ inline bool app_stat(command_executor *e, shell_context *sc, arguments args)
     }
     std::ostream out(buf);
 
-    table_printer tp;
+    ::dsn::utils::table_printer tp;
     tp.add_title(app_name.empty() ? "app" : "pidx");
-    tp.add_column("GET");
-    tp.add_column("MGET");
-    tp.add_column("PUT");
-    tp.add_column("MPUT");
-    tp.add_column("DEL");
-    tp.add_column("MDEL");
-    tp.add_column("INCR");
-    tp.add_column("CAS");
-    tp.add_column("CAM");
-    tp.add_column("SCAN");
+    tp.add_column("GET", tp_alignment::kRight);
+    tp.add_column("MGET", tp_alignment::kRight);
+    tp.add_column("PUT", tp_alignment::kRight);
+    tp.add_column("MPUT", tp_alignment::kRight);
+    tp.add_column("DEL", tp_alignment::kRight);
+    tp.add_column("MDEL", tp_alignment::kRight);
+    tp.add_column("INCR", tp_alignment::kRight);
+    tp.add_column("CAS", tp_alignment::kRight);
+    tp.add_column("CAM", tp_alignment::kRight);
+    tp.add_column("SCAN", tp_alignment::kRight);
     if (!only_qps) {
-        tp.add_column("expired");
-        tp.add_column("filtered");
-        tp.add_column("abnormal");
-        tp.add_column("delayed");
-        tp.add_column("rejected");
-        tp.add_column("file_mb");
-        tp.add_column("file_num");
-        tp.add_column("hit_rate");
-        tp.add_column("rdb_mem_mb");
+        tp.add_column("expired", tp_alignment::kRight);
+        tp.add_column("filtered", tp_alignment::kRight);
+        tp.add_column("abnormal", tp_alignment::kRight);
+        tp.add_column("delayed", tp_alignment::kRight);
+        tp.add_column("rejected", tp_alignment::kRight);
+        tp.add_column("file_mb", tp_alignment::kRight);
+        tp.add_column("file_num", tp_alignment::kRight);
+        tp.add_column("mem_tbl_mb", tp_alignment::kRight);
+        tp.add_column("mem_idx_mb", tp_alignment::kRight);
+        tp.add_column("hit_rate", tp_alignment::kRight);
     }
 
     for (row_data &row : rows) {
@@ -3720,15 +4043,13 @@ inline bool app_stat(command_executor *e, shell_context *sc, arguments args)
             tp.append_data(row.recent_write_throttling_reject_count);
             tp.append_data(row.storage_mb);
             tp.append_data((uint64_t)row.storage_count);
+            tp.append_data(row.rdb_memtable_mem_usage / (1 << 20U));
+            tp.append_data(row.rdb_index_and_filter_blocks_mem_usage / (1 << 20U));
             double block_cache_hit_rate =
                 std::abs(row.rdb_block_cache_total_count) < 1e-6
                     ? 0.0
                     : row.rdb_block_cache_hit_count / row.rdb_block_cache_total_count;
             tp.append_data(block_cache_hit_rate);
-            tp.append_data((row.rdb_block_cache_mem_usage +
-                            row.rdb_index_and_filter_blocks_mem_usage +
-                            row.rdb_memtable_mem_usage) /
-                           (1 << 20U));
         }
     }
     tp.output(out);

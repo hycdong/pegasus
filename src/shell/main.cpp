@@ -56,7 +56,8 @@ static command_executor commands[] = {
     {
         "nodes",
         "get the node status for this cluster",
-        "[-d|--detailed] [-o|--output file_name] [-s|--status all|alive|unalive]",
+        "[-d|--detailed] [-r|--resolve_ip] [-u|--resource_usage] "
+        "[-o|--output file_name] [-s|--status all|alive|unalive]",
         ls_nodes,
     },
     {
@@ -246,8 +247,14 @@ static command_executor commands[] = {
         "copy_data",
         "copy app data",
         "<-c|--target_cluster_name str> <-a|--target_app_name str> "
-        "[-s|--max_split_count num] [-b|--max_batch_count num] [-t|--timeout_ms num] "
-        "[-g|--geo_data]",
+        "[-h|--hash_key_filter_type anywhere|prefix|postfix] "
+        "[-x|--hash_key_filter_pattern str] "
+        "[-s|--sort_key_filter_type anywhere|prefix|postfix] "
+        "[-y|--sort_key_filter_pattern str] "
+        "[-v|--value_filter_type anywhere|prefix|postfix] "
+        "[-z|--value_filter_pattern str] "
+        "[-p|--partition num] [-b|--max_batch_count num] [-t|--timeout_ms num] "
+        "[-g|--geo_data] [-i|--no_value] [-n|--no_overwrite]",
         data_operations,
     },
     {
