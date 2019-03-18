@@ -187,8 +187,8 @@ TEST_F(split, split_scan)
             }
         }
         if(!completed){
-            if((++try_count)%5==0){
-                std::cerr << "try hash_scan during split, try count is " << try_count/5 << std::endl;
+            if((++try_count)%3==0){
+                std::cerr << "try hash_scan during split, try count is " << try_count/3 << std::endl;
                 // hash_scan during this procedure
                 pegasus::pegasus_client::pegasus_scanner *scanner = nullptr;
                 pegasus::pegasus_client::scan_options options;
