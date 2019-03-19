@@ -19,6 +19,7 @@ namespace server {
 class KeyWithTTLCompactionFilter : public rocksdb::CompactionFilter
 {
 public:
+//<<<<<<< HEAD
     KeyWithTTLCompactionFilter(uint32_t value_schema_version,
                                uint32_t default_ttl,
                                bool enabled,
@@ -76,6 +77,34 @@ public:
             }
         }
         return false;
+//=======
+//    KeyWithTTLCompactionFilter(uint32_t value_schema_version, uint32_t default_ttl, bool enabled)
+//        : _value_schema_version(value_schema_version), _default_ttl(default_ttl), _enabled(enabled)
+//    {
+//    }
+
+//    bool Filter(int /*level*/,
+//                const rocksdb::Slice &key,
+//                const rocksdb::Slice &existing_value,
+//                std::string *new_value,
+//                bool *value_changed) const override
+//    {
+//        if (!_enabled) {
+//            return false;
+//        }
+
+//        uint32_t expire_ts =
+//            pegasus_extract_expire_ts(_value_schema_version, utils::to_string_view(existing_value));
+//        if (_default_ttl != 0 && expire_ts == 0) {
+//            // should update ttl
+//            *new_value = existing_value.ToString();
+//            pegasus_update_expire_ts(
+//                _value_schema_version, *new_value, utils::epoch_now() + _default_ttl);
+//            *value_changed = true;
+//            return false;
+//        }
+//        return check_if_ts_expired(utils::epoch_now(), expire_ts);
+//>>>>>>> 1.11.3
     }
 
     const char *Name() const override { return "KeyWithTTLCompactionFilter"; }
@@ -99,12 +128,17 @@ public:
     std::unique_ptr<rocksdb::CompactionFilter>
     CreateCompactionFilter(const rocksdb::CompactionFilter::Context & /*context*/) override
     {
+//<<<<<<< HEAD
         return std::unique_ptr<KeyWithTTLCompactionFilter>(
             new KeyWithTTLCompactionFilter(_value_schema_version.load(),
                                            _default_ttl.load(),
                                            _enabled.load(),
                                            _partition_id.load(),
                                            _partition_version.load()));
+//=======
+//        return std::unique_ptr<KeyWithTTLCompactionFilter>(new KeyWithTTLCompactionFilter(
+//            _value_schema_version.load(), _default_ttl.load(), _enabled.load()));
+//>>>>>>> 1.11.3
     }
     const char *Name() const override { return "KeyWithTTLCompactionFilterFactory"; }
 
@@ -114,19 +148,25 @@ public:
     }
     void EnableFilter() { _enabled.store(true, std::memory_order_release); }
     void SetDefaultTTL(uint32_t ttl) { _default_ttl.store(ttl, std::memory_order_release); }
+//<<<<<<< HEAD
     void SetPartitionId(uint32_t partition_id) { _partition_id.store(partition_id); }
     void SetPartitionVersion(uint32_t partition_version)
     {
         _partition_version.store(partition_version);
     }
+//=======
+//>>>>>>> 1.11.3
 
 private:
     std::atomic<uint32_t> _value_schema_version;
     std::atomic<uint32_t> _default_ttl;
     std::atomic_bool _enabled; // only process filtering when _enabled == true
+//<<<<<<< HEAD
 
     std::atomic<uint32_t> _partition_id;
     std::atomic<uint32_t> _partition_version;
+//=======
+//>>>>>>> 1.11.3
 };
 
 } // namespace server

@@ -1012,6 +1012,7 @@ void pegasus_client_impl::async_check_and_mutate(const std::string &hash_key,
             req.mutate_list[i].set_expire_ts_seconds = mu.set_expire_ts_seconds;
         }
     }
+
     req.return_check_value = options.return_check_value;
 
     ::dsn::blob tmp_key;
