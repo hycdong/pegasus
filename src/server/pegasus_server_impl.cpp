@@ -2357,41 +2357,6 @@ void pegasus_server_impl::update_usage_scenario(const std::map<std::string, std:
     }
 }
 
-//bool pegasus_server_impl::compression_str_to_type(const std::string &compression_str,
-//                                                  rocksdb::CompressionType &type)
-//{
-//    if (compression_str == "none") {
-//        type = rocksdb::kNoCompression;
-//    } else if (compression_str == "snappy") {
-//        type = rocksdb::kSnappyCompression;
-//    } else if (compression_str == "lz4") {
-//        type = rocksdb::kLZ4Compression;
-//    } else if (compression_str == "zstd") {
-//        type = rocksdb::kZSTD;
-//    } else {
-//        derror_replica("Unsupported compression type: {}.", compression_str);
-//        return false;
-//    }
-//    return true;
-//}
-
-//std::string pegasus_server_impl::compression_type_to_str(rocksdb::CompressionType type)
-//{
-//    switch (type) {
-//    case rocksdb::kNoCompression:
-//        return "none";
-//    case rocksdb::kSnappyCompression:
-//        return "snappy";
-//    case rocksdb::kLZ4Compression:
-//        return "lz4";
-//    case rocksdb::kZSTD:
-//        return "zstd";
-//    default:
-//        derror_replica("Unsupported compression type: {}.", type);
-//        return "<unsupported>";
-//    }
-//}
-
 void pegasus_server_impl::update_default_ttl(const std::map<std::string, std::string> &envs)
 {
     auto find = envs.find(TABLE_LEVEL_DEFAULT_TTL);
