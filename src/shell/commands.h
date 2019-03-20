@@ -34,6 +34,36 @@
 using namespace dsn::replication;
 using tp_alignment = ::dsn::utils::table_printer::alignment;
 
+static const char *INDENT = "  ";
+struct list_nodes_helper
+{
+    std::string node_name;
+    std::string node_status;
+    int primary_count;
+    int secondary_count;
+    int64_t memused_res_mb;
+    int64_t block_cache_bytes;
+    int64_t mem_tbl_bytes;
+    int64_t mem_idx_bytes;
+    int64_t disk_available_total_ratio;
+    int64_t disk_available_min_ratio;
+    list_nodes_helper(const std::string &n, const std::string &s)
+        : node_name(n),
+          node_status(s),
+          primary_count(0),
+          secondary_count(0),
+          memused_res_mb(0),
+          block_cache_bytes(0),
+          mem_tbl_bytes(0),
+          mem_idx_bytes(0),
+          disk_available_total_ratio(0),
+          disk_available_min_ratio(0)
+    {
+    }
+};
+
+// == miscellaneous (see 'commands/misc.cpp') == //
+
 bool help_info(command_executor *e, shell_context *sc, arguments args);
 
 bool version(command_executor *e, shell_context *sc, arguments args);

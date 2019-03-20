@@ -323,16 +323,6 @@ inline void scan_data_next(scan_data_context *context)
                             if (context->top_count > 0) {
                                 context->top_rows.push(
                                     std::move(hash_key), std::move(sort_key), row_size);
-//<<<<<<< HEAD
-//                            }
-//                        }
-//                        if (context->count_hash_key) {
-//                            if (hash_key != context->last_hash_key) {
-//                                context->split_hash_key_count++;
-//                                context->last_hash_key = std::move(hash_key);
-//                            }
-//                        }
-//=======
                             }
                         }
                         if (context->count_hash_key) {
@@ -341,7 +331,6 @@ inline void scan_data_next(scan_data_context *context)
                                 context->last_hash_key = std::move(hash_key);
                             }
                         }
-//>>>>>>> 1.11.3
                         scan_data_next(context);
                         break;
                     case SCAN_GEN_GEO:
@@ -373,11 +362,8 @@ inline void scan_data_next(scan_data_context *context)
                         dassert(false, "op = %d", context->op);
                         break;
                     }
-//<<<<<<< HEAD
-//=======
                 } else {
                     scan_data_next(context);
-//>>>>>>> 1.11.3
                 }
             } else if (ret == pegasus::PERR_SCAN_COMPLETE) {
                 context->split_completed.store(true);
