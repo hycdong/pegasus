@@ -417,6 +417,18 @@ static command_executor commands[] = {
         app_partition_split,
     },
     {
+        "pause_single_partition_split",
+        "pause a single partition split",
+        "<app_name> <parent_partition_index>",
+        pause_single_partition_split,
+    },
+    {
+        "restart_single_partition_split",
+        "clear pause flag of single partition to permit split",
+        "<app_name> <parent_partition_index>",
+        restart_single_partition_split,
+    },
+    {
         "exit", "exit shell", "", exit_shell,
     },
     {

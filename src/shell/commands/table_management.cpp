@@ -820,3 +820,55 @@ bool app_partition_split(command_executor *e, shell_context *sc, arguments args)
 
     return true;
 }
+
+bool pause_single_partition_split(command_executor *e, shell_context *sc, arguments args)
+{
+    if (args.argc < 3)
+        return false;
+
+    std::string app_name = args.argv[1];
+    int pause_partition_index = atoi(args.argv[2]);
+
+    if (pause_partition_index < 0) {
+        fprintf(stderr, "partition index should be greater than zero");
+        return false;
+    }
+
+    // ddl->pause_single_partition
+    ::dsn::error_code err =
+        sc->ddl_client->control_single_partition_split(app_name, pause_partition_index, true);
+    if (err == ::dsn::ERR_OK || err == ::dsn::ERR_NO_NEED_OPERATE)
+        std::cout << "pause split app " << app_name << " partition[" << pause_partition_index
+                  << "] succeed" << std::endl;
+    else
+        std::cout << "pause split app " << app_name << " partition[" << pause_partition_index
+                  << "] failed, error is " << err.to_string() << std::endl;
+
+    return true;
+}
+
+bool restart_single_partition_split(command_executor *e, shell_context *sc, arguments args)
+{
+    if (args.argc < 3)
+        return false;
+
+    std::string app_name = args.argv[1];
+    int restart_partition_index = atoi(args.argv[2]);
+
+    if (restart_partition_index < 0) {
+        fprintf(stderr, "partition index should be greater than zero");
+        return false;
+    }
+
+    // ddl->pause_single_partition
+    ::dsn::error_code err =
+        sc->ddl_client->control_single_partition_split(app_name, restart_partition_index, false);
+    if (err == ::dsn::ERR_OK || err == ::dsn::ERR_NO_NEED_OPERATE)
+        std::cout << "restart split app " << app_name << " partition[" << restart_partition_index
+                  << "] succeed" << std::endl;
+    else
+        std::cout << "restart split app " << app_name << " partition[" << restart_partition_index
+                  << "] failed, error is " << err.to_string() << std::endl;
+
+    return true;
+}

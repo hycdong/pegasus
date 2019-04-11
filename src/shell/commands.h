@@ -121,6 +121,10 @@ bool clear_app_envs(command_executor *e, shell_context *sc, arguments args);
 
 bool app_partition_split(command_executor *e, shell_context *sc, arguments args);
 
+bool pause_single_partition_split(command_executor *e, shell_context *sc, arguments args);
+
+bool restart_single_partition_split(command_executor *e, shell_context *sc, arguments args);
+
 // == data operations (see 'commands/data_operations.cpp') == //
 
 bool data_operations(command_executor *e, shell_context *sc, arguments args);
