@@ -119,12 +119,6 @@ bool del_app_envs(command_executor *e, shell_context *sc, arguments args);
 
 bool clear_app_envs(command_executor *e, shell_context *sc, arguments args);
 
-bool app_partition_split(command_executor *e, shell_context *sc, arguments args);
-
-bool pause_single_partition_split(command_executor *e, shell_context *sc, arguments args);
-
-bool restart_single_partition_split(command_executor *e, shell_context *sc, arguments args);
-
 // == data operations (see 'commands/data_operations.cpp') == //
 
 bool data_operations(command_executor *e, shell_context *sc, arguments args);
@@ -212,3 +206,15 @@ bool sst_dump(command_executor *e, shell_context *sc, arguments args);
 bool mlog_dump(command_executor *e, shell_context *sc, arguments args);
 
 bool local_get(command_executor *e, shell_context *sc, arguments args);
+
+// == partition_split (see 'commands/partition_split.cpp') == //
+
+bool app_partition_split(command_executor *e, shell_context *sc, arguments args);
+
+bool pause_single_partition_split(command_executor *e, shell_context *sc, arguments args);
+
+bool restart_single_partition_split(command_executor *e, shell_context *sc, arguments args);
+
+bool cancel_app_partition_split(command_executor *e, shell_context *sc, arguments args);
+
+bool clear_partition_split_flag(command_executor *e, shell_context *sc, arguments args);

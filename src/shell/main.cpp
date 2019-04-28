@@ -429,6 +429,18 @@ static command_executor commands[] = {
         restart_single_partition_split,
     },
     {
+        "cancel_app_partition_split",
+        "cancel split partitions of app",
+        "<app_name> <original_partition_count> [-f|--force]",
+        cancel_app_partition_split,
+    },
+    {
+        "clear_app_partition_split_flag",
+        "clear all partitions split flags",
+        "<app_name>",
+        clear_partition_split_flag,
+    },
+    {
         "exit", "exit shell", "", exit_shell,
     },
     {

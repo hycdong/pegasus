@@ -43,6 +43,7 @@ public:
         create_table("split_table", partition_count);
         create_table("scan_split", partition_count);
         create_table("pause_split", partition_count);
+        create_table("cancel_split", partition_count);
     }
 
     static void TearDownTestCase(){
@@ -50,6 +51,7 @@ public:
         drop_table("split_table");
         drop_table("scan_split");
         drop_table("pause_split");
+        drop_table("cancel_split");
     }
 };
 
@@ -322,3 +324,112 @@ TEST_F(split, pause_split)
     }
 }
 
+TEST_F(split, cancel_split)
+{
+    static std::map<std::string, std::map<std::string, std::string>> expected;
+    const std::string split_table = "cancel_split";
+    dsn::error_code error;
+    pegasus::pegasus_client *pg_client =
+        pegasus::pegasus_client_factory::get_client("mycluster", split_table.c_str());
+
+    // write data
+    int count = 1000, i;
+    for (i = 0; i < count; ++i) {
+        std::string hash_key = "hashkey" + boost::lexical_cast<std::string>(i);
+        std::string sort_key = "sortkey" + boost::lexical_cast<std::string>(i);
+        auto ret = pg_client->set(hash_key, sort_key, "value");
+        expected[hash_key][sort_key] = "value";
+        ASSERT_EQ(ret, 0);
+    }
+
+    // succeed
+    error = ddl_client->app_partition_split(split_table, partition_count * 2);
+    ASSERT_EQ(dsn::ERR_OK, error);
+
+    // set during this procedure
+    int counter = 0;
+    bool completed = false;
+    while(!completed){
+        // pause partition[0]
+        if(counter == 1){
+            error = ddl_client->control_single_partition_split(split_table, 0, true);
+            ASSERT_EQ(dsn::ERR_OK, error);
+            std::cerr << "pause split partition[0]" << std::endl;
+        }
+
+        int app_id, partition;
+        std::vector<dsn::partition_configuration> partitions;
+        error = ddl_client->list_app(split_table, app_id, partition, partitions);
+        ASSERT_EQ(dsn::ERR_OK, error);
+        ASSERT_EQ(partition, partition_count * 2);
+
+        int finish_count = 0;
+        for(int i = partition_count; i < partition; ++i){
+            if(partitions[i].ballot > invalid_ballot){
+                ++finish_count;
+            }
+        }
+
+        if(finish_count == partition_count-1){
+            completed = true;
+        }else{
+            std::cerr << (partition_count-finish_count) << " partition not finish split" << std::endl;
+
+        }
+        ++counter;
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
+
+    // [0,y,z] will write to partition[3], won't lost
+    // [5,y,z] will write to partition[5], will be lost after cancel
+    std::string hash_key1 = boost::lexical_cast<std::string>(0);
+    std::string hash_key2 = boost::lexical_cast<std::string>(5);
+    for(i = 0; i < counter; ++i){
+        std::string sort_key = boost::lexical_cast<std::string>(i);
+        auto ret = pg_client->set(hash_key1, sort_key, "value");
+        ASSERT_EQ(ret, 0);
+        expected[hash_key1][sort_key] = "value";
+
+        ret = pg_client->set(hash_key2, sort_key, "value");
+        ASSERT_EQ(ret, 0);
+    }
+
+    // cancel partition split
+    error = ddl_client->cancel_app_partition_split(split_table, partition_count, true);
+    ASSERT_EQ(dsn::ERR_OK, error);
+    std::cerr << "cancel partition split" << std::endl;
+
+    std::cerr << "sleep for 30 seconds to notify replica server" << std::endl;
+    std::this_thread::sleep_for(std::chrono::seconds(30));
+
+    // validate data after partition split
+    while (i < count) {
+        std::string hash_key = "hashkey" + boost::lexical_cast<std::string>(i);
+        std::string sort_key = "sortkey" + boost::lexical_cast<std::string>(i);
+        std::string value;
+        auto ret = pg_client->get(hash_key, sort_key, value);
+        // retry when timeout
+        if (ret == -2) {
+            continue;
+        } else {
+            ASSERT_EQ(expected[hash_key][sort_key], value);
+            ++i;
+        }
+    }
+
+    for (i = 0; i < counter; ++i) {
+        // [0,y,z] won't be lost
+        std::string sort_key = boost::lexical_cast<std::string>(i);
+        std::string value1;
+        auto ret = pg_client->get(hash_key1, sort_key, value1);
+        ASSERT_EQ(ret, 0);
+        ASSERT_EQ(expected[hash_key1][sort_key], value1);
+
+        // [5,y,z] will be lost
+        std::string value2;
+        ret = pg_client->get(hash_key2, sort_key, value2);
+        // not found
+        ASSERT_EQ(ret, -1001);
+        ASSERT_EQ("", value2);
+    }
+}

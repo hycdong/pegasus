@@ -2696,7 +2696,6 @@ void pegasus_server_impl::set_partition_version(uint32_t partition_version)
            _gpid.get_partition_index(),
            _partition_version.load(),
            partition_version);
-    dassert(partition_version >= _partition_version, "");
 
     _partition_version.store(partition_version);
     _key_ttl_compaction_filter_factory->SetPartitionVersion(partition_version);
