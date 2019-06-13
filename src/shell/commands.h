@@ -164,6 +164,8 @@ bool clear_data(command_executor *e, shell_context *sc, arguments args);
 
 bool count_data(command_executor *e, shell_context *sc, arguments args);
 
+bool start_bulk_load(command_executor *e, shell_context *sc, arguments args);
+
 // == load balancing(see 'commands/rebalance.cpp') == //
 
 bool set_meta_level(command_executor *e, shell_context *sc, arguments args);

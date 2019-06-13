@@ -407,6 +407,12 @@ static command_executor commands[] = {
         ddd_diagnose,
     },
     {
+        "start_bulk_load",
+        "start app bulk load",
+        "[-a --app_name str] [-c --cluster_name str] [-p --file_provider_type str]",
+        start_bulk_load,
+    },
+    {
         "exit", "exit shell", "", exit_shell,
     },
     {
