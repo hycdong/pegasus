@@ -164,8 +164,6 @@ bool clear_data(command_executor *e, shell_context *sc, arguments args);
 
 bool count_data(command_executor *e, shell_context *sc, arguments args);
 
-bool start_bulk_load(command_executor *e, shell_context *sc, arguments args);
-
 // == load balancing(see 'commands/rebalance.cpp') == //
 
 bool set_meta_level(command_executor *e, shell_context *sc, arguments args);
@@ -199,6 +197,12 @@ bool restore(command_executor *e, shell_context *sc, arguments args);
 bool query_backup_policy(command_executor *e, shell_context *sc, arguments args);
 
 bool query_restore_status(command_executor *e, shell_context *sc, arguments args);
+
+// bulk_load.cpp //
+
+bool start_bulk_load(command_executor *e, shell_context *sc, arguments args);
+
+bool query_bulk_load_status(command_executor *e, shell_context *sc, arguments args);
 
 // == debugger (see 'commands/debugger.cpp') == //Debugging tool
 

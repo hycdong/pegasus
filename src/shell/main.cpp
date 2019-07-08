@@ -413,6 +413,12 @@ static command_executor commands[] = {
         start_bulk_load,
     },
     {
+        "query_bulk_load_status",
+        "query app bulk load status",
+        "[-a --app_name str] [-d --detailed]",
+        query_bulk_load_status,
+    },
+    {
         "exit", "exit shell", "", exit_shell,
     },
     {

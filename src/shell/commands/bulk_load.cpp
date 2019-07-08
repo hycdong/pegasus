@@ -59,3 +59,41 @@ bool start_bulk_load(command_executor *e, shell_context *sc, arguments args)
 
     return true;
 }
+
+bool query_bulk_load_status(command_executor *e, shell_context *sc, arguments args)
+{
+    static struct option long_options[] = {
+        {"app_name", required_argument, 0, 'a'}, {"detailed", no_argument, 0, 'd'}, {0, 0, 0, 0}};
+    std::string app_name;
+    optind = 0;
+    bool detailed = false;
+    while (true) {
+        int option_index = 0;
+        int c;
+        c = getopt_long(args.argc, args.argv, "a:d", long_options, &option_index);
+        if (c == -1)
+            break;
+        switch (c) {
+        case 'a':
+            app_name = optarg;
+            break;
+        case 'd':
+            detailed = true;
+            break;
+        default:
+            return false;
+        }
+    }
+
+    if (app_name.empty()) {
+        fprintf(stderr, "app_name should not be empty\n");
+        return false;
+    }
+
+    ::dsn::error_code ret = sc->ddl_client->query_bulk_load(app_name, detailed);
+
+    if (ret != ::dsn::ERR_OK) {
+        fprintf(stderr, "query bulk load status failed, err = %s\n", ret.to_string());
+    }
+    return true;
+}
