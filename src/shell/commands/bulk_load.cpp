@@ -62,20 +62,28 @@ bool start_bulk_load(command_executor *e, shell_context *sc, arguments args)
 
 bool query_bulk_load_status(command_executor *e, shell_context *sc, arguments args)
 {
-    static struct option long_options[] = {
-        {"app_name", required_argument, 0, 'a'}, {"detailed", no_argument, 0, 'd'}, {0, 0, 0, 0}};
+    static struct option long_options[] = {{"app_name", required_argument, 0, 'a'},
+                                           {"partition_index", required_argument, 0, 'i'},
+                                           {"detailed", no_argument, 0, 'd'},
+                                           {0, 0, 0, 0}};
+
     std::string app_name;
-    optind = 0;
+    int32_t pidx = -1;
     bool detailed = false;
+
+    optind = 0;
     while (true) {
         int option_index = 0;
         int c;
-        c = getopt_long(args.argc, args.argv, "a:d", long_options, &option_index);
+        c = getopt_long(args.argc, args.argv, "a:i:d", long_options, &option_index);
         if (c == -1)
             break;
         switch (c) {
         case 'a':
             app_name = optarg;
+            break;
+        case 'i':
+            pidx = boost::lexical_cast<int32_t>(optarg);
             break;
         case 'd':
             detailed = true;
@@ -90,7 +98,7 @@ bool query_bulk_load_status(command_executor *e, shell_context *sc, arguments ar
         return false;
     }
 
-    ::dsn::error_code ret = sc->ddl_client->query_bulk_load(app_name, detailed);
+    ::dsn::error_code ret = sc->ddl_client->query_bulk_load(app_name, pidx, detailed);
 
     if (ret != ::dsn::ERR_OK) {
         fprintf(stderr, "query bulk load status failed, err = %s\n", ret.to_string());

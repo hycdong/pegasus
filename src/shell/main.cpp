@@ -415,7 +415,7 @@ static command_executor commands[] = {
     {
         "query_bulk_load_status",
         "query app bulk load status",
-        "[-a --app_name str] [-d --detailed]",
+        "[-a --app_name str] [-i --partition_index num] [-d --detailed]",
         query_bulk_load_status,
     },
     {
