@@ -1529,7 +1529,6 @@ void pegasus_server_impl::on_clear_scanner(const int64_t &args) { _context_cache
         _key_ttl_compaction_filter_factory->EnableFilter();
         _key_ttl_compaction_filter_factory->SetPartitionId(_gpid.get_partition_index());
 
-
         // update LastManualCompactFinishTime
         _manual_compact_svc.init_last_finish_time_ms(_db->GetLastManualCompactFinishTime());
 

@@ -82,8 +82,7 @@ bool cancel_app_partition_split(command_executor *e, shell_context *sc, argument
     if (args.argc < 3)
         return false;
 
-    static struct option long_options[] = {
-        {"force", no_argument, 0, 'f'}, {0, 0, 0, 0}};
+    static struct option long_options[] = {{"force", no_argument, 0, 'f'}, {0, 0, 0, 0}};
 
     std::string app_name = args.argv[1];
     int original_partition_count = atoi(args.argv[2]);
@@ -116,7 +115,8 @@ bool cancel_app_partition_split(command_executor *e, shell_context *sc, argument
     if (err == ::dsn::ERR_OK)
         std::cout << "cancel split app " << app_name << " succeed" << std::endl;
     else
-        std::cout << "cancel split app " << app_name << " failed, error is " << err.to_string() << std::endl;
+        std::cout << "cancel split app " << app_name << " failed, error is " << err.to_string()
+                  << std::endl;
 
     return true;
 }
