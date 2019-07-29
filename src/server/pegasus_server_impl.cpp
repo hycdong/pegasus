@@ -19,6 +19,7 @@
 #include "base/pegasus_key_schema.h"
 #include "base/pegasus_value_schema.h"
 #include "base/pegasus_utils.h"
+#include "capacity_unit_calculator.h"
 #include "pegasus_event_listener.h"
 #include "pegasus_server_write.h"
 
@@ -260,74 +261,74 @@ pegasus_server_impl::pegasus_server_impl(dsn::replication::replica *r)
         "pegasus.server", "update_rdb_stat_interval", 600, "update_rdb_stat_interval, in seconds"));
 
     // TODO: move the qps/latency counters and it's statistics to replication_app_base layer
-    char str_gpid[128], buf[256];
-    snprintf(str_gpid, 128, "%d.%d", _gpid.get_app_id(), _gpid.get_partition_index());
+    std::string str_gpid = _gpid.to_string();
+    char name[256];
 
     // register the perf counters
-    snprintf(buf, 255, "get_qps@%s", str_gpid);
+    snprintf(name, 255, "get_qps@%s", str_gpid.c_str());
     _pfc_get_qps.init_app_counter(
-        "app.pegasus", buf, COUNTER_TYPE_RATE, "statistic the qps of GET request");
+        "app.pegasus", name, COUNTER_TYPE_RATE, "statistic the qps of GET request");
 
-    snprintf(buf, 255, "multi_get_qps@%s", str_gpid);
+    snprintf(name, 255, "multi_get_qps@%s", str_gpid.c_str());
     _pfc_multi_get_qps.init_app_counter(
-        "app.pegasus", buf, COUNTER_TYPE_RATE, "statistic the qps of MULTI_GET request");
+        "app.pegasus", name, COUNTER_TYPE_RATE, "statistic the qps of MULTI_GET request");
 
-    snprintf(buf, 255, "scan_qps@%s", str_gpid);
+    snprintf(name, 255, "scan_qps@%s", str_gpid.c_str());
     _pfc_scan_qps.init_app_counter(
-        "app.pegasus", buf, COUNTER_TYPE_RATE, "statistic the qps of SCAN request");
+        "app.pegasus", name, COUNTER_TYPE_RATE, "statistic the qps of SCAN request");
 
-    snprintf(buf, 255, "get_latency@%s", str_gpid);
+    snprintf(name, 255, "get_latency@%s", str_gpid.c_str());
     _pfc_get_latency.init_app_counter("app.pegasus",
-                                      buf,
+                                      name,
                                       COUNTER_TYPE_NUMBER_PERCENTILES,
                                       "statistic the latency of GET request");
 
-    snprintf(buf, 255, "multi_get_latency@%s", str_gpid);
+    snprintf(name, 255, "multi_get_latency@%s", str_gpid.c_str());
     _pfc_multi_get_latency.init_app_counter("app.pegasus",
-                                            buf,
+                                            name,
                                             COUNTER_TYPE_NUMBER_PERCENTILES,
                                             "statistic the latency of MULTI_GET request");
 
-    snprintf(buf, 255, "scan_latency@%s", str_gpid);
+    snprintf(name, 255, "scan_latency@%s", str_gpid.c_str());
     _pfc_scan_latency.init_app_counter("app.pegasus",
-                                       buf,
+                                       name,
                                        COUNTER_TYPE_NUMBER_PERCENTILES,
                                        "statistic the latency of SCAN request");
 
-    snprintf(buf, 255, "recent.expire.count@%s", str_gpid);
+    snprintf(name, 255, "recent.expire.count@%s", str_gpid.c_str());
     _pfc_recent_expire_count.init_app_counter("app.pegasus",
-                                              buf,
+                                              name,
                                               COUNTER_TYPE_VOLATILE_NUMBER,
                                               "statistic the recent expired value read count");
 
-    snprintf(buf, 255, "recent.filter.count@%s", str_gpid);
+    snprintf(name, 255, "recent.filter.count@%s", str_gpid.c_str());
     _pfc_recent_filter_count.init_app_counter("app.pegasus",
-                                              buf,
+                                              name,
                                               COUNTER_TYPE_VOLATILE_NUMBER,
                                               "statistic the recent filtered value read count");
 
-    snprintf(buf, 255, "recent.abnormal.count@%s", str_gpid);
+    snprintf(name, 255, "recent.abnormal.count@%s", str_gpid.c_str());
     _pfc_recent_abnormal_count.init_app_counter("app.pegasus",
-                                                buf,
+                                                name,
                                                 COUNTER_TYPE_VOLATILE_NUMBER,
                                                 "statistic the recent abnormal read count");
 
-    snprintf(buf, 255, "disk.storage.sst.count@%s", str_gpid);
+    snprintf(name, 255, "disk.storage.sst.count@%s", str_gpid.c_str());
     _pfc_rdb_sst_count.init_app_counter(
-        "app.pegasus", buf, COUNTER_TYPE_NUMBER, "statistic the count of sstable files");
+        "app.pegasus", name, COUNTER_TYPE_NUMBER, "statistic the count of sstable files");
 
-    snprintf(buf, 255, "disk.storage.sst(MB)@%s", str_gpid);
+    snprintf(name, 255, "disk.storage.sst(MB)@%s", str_gpid.c_str());
     _pfc_rdb_sst_size.init_app_counter(
-        "app.pegasus", buf, COUNTER_TYPE_NUMBER, "statistic the size of sstable files");
+        "app.pegasus", name, COUNTER_TYPE_NUMBER, "statistic the size of sstable files");
 
-    snprintf(buf, 255, "rdb.block_cache.hit_count@%s", str_gpid);
+    snprintf(name, 255, "rdb.block_cache.hit_count@%s", str_gpid.c_str());
     _pfc_rdb_block_cache_hit_count.init_app_counter(
-        "app.pegasus", buf, COUNTER_TYPE_NUMBER, "statistic the hit count of rocksdb block cache");
+        "app.pegasus", name, COUNTER_TYPE_NUMBER, "statistic the hit count of rocksdb block cache");
 
-    snprintf(buf, 255, "rdb.block_cache.total_count@%s", str_gpid);
+    snprintf(name, 255, "rdb.block_cache.total_count@%s", str_gpid.c_str());
     _pfc_rdb_block_cache_total_count.init_app_counter(
         "app.pegasus",
-        buf,
+        name,
         COUNTER_TYPE_NUMBER,
         "statistic the total count of rocksdb block cache");
 
@@ -343,16 +344,16 @@ pegasus_server_impl::pegasus_server_impl(dsn::replication::replica *r)
             "statistic the memory usage of rocksdb block cache");
     });
 
-    snprintf(buf, 255, "rdb.index_and_filter_blocks.memory_usage@%s", str_gpid);
+    snprintf(name, 255, "rdb.index_and_filter_blocks.memory_usage@%s", str_gpid.c_str());
     _pfc_rdb_index_and_filter_blocks_mem_usage.init_app_counter(
         "app.pegasus",
-        buf,
+        name,
         COUNTER_TYPE_NUMBER,
         "statistic the memory usage of rocksdb index and filter blocks");
 
-    snprintf(buf, 255, "rdb.memtable.memory_usage@%s", str_gpid);
+    snprintf(name, 255, "rdb.memtable.memory_usage@%s", str_gpid.c_str());
     _pfc_rdb_memtable_mem_usage.init_app_counter(
-        "app.pegasus", buf, COUNTER_TYPE_NUMBER, "statistic the memory usage of rocksdb memtable");
+        "app.pegasus", name, COUNTER_TYPE_NUMBER, "statistic the memory usage of rocksdb memtable");
 }
 
 void pegasus_server_impl::parse_checkpoints()
@@ -605,6 +606,7 @@ void pegasus_server_impl::on_get(const ::dsn::blob &key,
         pegasus_extract_user_data(_value_schema_version, std::move(value), resp.value);
     }
 
+    _cu_calculator->add_get_cu(resp.error, resp.value);
     _pfc_get_latency->set(dsn_now_ns() - start_time);
 
     reply(resp);
@@ -629,6 +631,7 @@ void pegasus_server_impl::on_multi_get(const ::dsn::apps::multi_get_request &req
                reply.to_address().to_string(),
                request.sort_key_filter_type);
         resp.error = rocksdb::Status::kInvalidArgument;
+        _cu_calculator->add_multi_get_cu(resp.error, resp.kvs);
         _pfc_multi_get_latency->set(dsn_now_ns() - start_time);
         reply(resp);
         return;
@@ -706,6 +709,7 @@ void pegasus_server_impl::on_multi_get(const ::dsn::apps::multi_get_request &req
                       stop_inclusive ? "inclusive" : "exclusive");
             }
             resp.error = rocksdb::Status::kOk;
+            _cu_calculator->add_multi_get_cu(resp.error, resp.kvs);
             _pfc_multi_get_latency->set(dsn_now_ns() - start_time);
             reply(resp);
             return;
@@ -976,6 +980,8 @@ void pegasus_server_impl::on_multi_get(const ::dsn::apps::multi_get_request &req
     if (filter_count > 0) {
         _pfc_recent_filter_count->add(filter_count);
     }
+
+    _cu_calculator->add_multi_get_cu(resp.error, resp.kvs);
     _pfc_multi_get_latency->set(dsn_now_ns() - start_time);
 
     reply(resp);
@@ -1040,6 +1046,8 @@ void pegasus_server_impl::on_sortkey_count(const ::dsn::blob &hash_key,
         resp.count = 0;
     }
 
+    _cu_calculator->add_sortkey_count_cu(resp.error);
+
     reply(resp);
 }
 
@@ -1101,6 +1109,8 @@ void pegasus_server_impl::on_ttl(const ::dsn::blob &key,
         }
     }
 
+    _cu_calculator->add_ttl_cu(resp.error);
+
     reply(resp);
 }
 
@@ -1123,6 +1133,8 @@ void pegasus_server_impl::on_get_scanner(const ::dsn::apps::get_scanner_request 
                reply.to_address().to_string(),
                request.hash_key_filter_type);
         resp.error = rocksdb::Status::kInvalidArgument;
+        _cu_calculator->add_scan_cu(resp.error, resp.kvs);
+        _pfc_scan_latency->set(dsn_now_ns() - start_time);
         reply(resp);
         return;
     }
@@ -1133,6 +1145,8 @@ void pegasus_server_impl::on_get_scanner(const ::dsn::apps::get_scanner_request 
                reply.to_address().to_string(),
                request.sort_key_filter_type);
         resp.error = rocksdb::Status::kInvalidArgument;
+        _cu_calculator->add_scan_cu(resp.error, resp.kvs);
+        _pfc_scan_latency->set(dsn_now_ns() - start_time);
         reply(resp);
         return;
     }
@@ -1171,7 +1185,8 @@ void pegasus_server_impl::on_get_scanner(const ::dsn::apps::get_scanner_request 
                   request.stop_inclusive ? "inclusive" : "exclusive");
         }
         resp.error = rocksdb::Status::kOk;
-        _pfc_multi_get_latency->set(dsn_now_ns() - start_time);
+        _cu_calculator->add_scan_cu(resp.error, resp.kvs);
+        _pfc_scan_latency->set(dsn_now_ns() - start_time);
         reply(resp);
         return;
     }
@@ -1287,7 +1302,9 @@ void pegasus_server_impl::on_get_scanner(const ::dsn::apps::get_scanner_request 
         _pfc_recent_filter_count->add(filter_count);
     }
 
+    _cu_calculator->add_scan_cu(resp.error, resp.kvs);
     _pfc_scan_latency->set(dsn_now_ns() - start_time);
+
     reply(resp);
 }
 
@@ -1400,7 +1417,9 @@ void pegasus_server_impl::on_scan(const ::dsn::apps::scan_request &request,
         resp.error = rocksdb::Status::Code::kNotFound;
     }
 
+    _cu_calculator->add_scan_cu(resp.error, resp.kvs);
     _pfc_scan_latency->set(dsn_now_ns() - start_time);
+
     reply(resp);
 }
 
@@ -1431,7 +1450,7 @@ void pegasus_server_impl::on_clear_scanner(const int64_t &args) { _context_cache
         }
     }
     // Update all envs before opening db, ensure all envs are effective for the newly opened db.
-    update_app_envs(envs);
+    update_app_envs_before_open_db(envs);
 
     rocksdb::Options opts = _db_opts;
     opts.create_if_missing = true;
@@ -1526,9 +1545,6 @@ void pegasus_server_impl::on_clear_scanner(const int64_t &args) { _context_cache
         // update LastManualCompactFinishTime
         _manual_compact_svc.init_last_finish_time_ms(_db->GetLastManualCompactFinishTime());
 
-        // set default usage scenario
-        set_usage_scenario(ROCKSDB_ENV_USAGE_SCENARIO_NORMAL);
-
         parse_checkpoints();
 
         // checkpoint if necessary to make last_durable_decree() fresh.
@@ -1561,6 +1577,9 @@ void pegasus_server_impl::on_clear_scanner(const int64_t &args) { _context_cache
 
         _is_open = true;
 
+        // set default usage scenario after db opened.
+        set_usage_scenario(ROCKSDB_ENV_USAGE_SCENARIO_NORMAL);
+
         dinfo("%s: start the update rocksdb statistics timer task", replica_name());
         _update_replica_rdb_stat =
             ::dsn::tasking::enqueue_timer(LPC_REPLICATION_LONG_COMMON,
@@ -1580,7 +1599,8 @@ void pegasus_server_impl::on_clear_scanner(const int64_t &args) { _context_cache
                 _update_rdb_stat_interval);
         });
 
-        // initialize write service after server being initialized.
+        // initialize cu calculator and write service after server being initialized.
+        _cu_calculator = dsn::make_unique<capacity_unit_calculator>(this);
         _server_write = dsn::make_unique<pegasus_server_write>(this, _verbose_log);
 
         return ::dsn::ERR_OK;
@@ -1746,19 +1766,11 @@ private:
 
     {
         ::dsn::utils::auto_lock<::dsn::utils::ex_lock_nr> l(_checkpoints_lock);
-        dassert(last_commit > last_durable_decree(),
-                "%" PRId64 " VS %" PRId64 "",
-                last_commit,
-                last_durable_decree());
-        dassert(last_commit == _db->GetLastFlushedDecree(),
-                "%" PRId64 " VS %" PRId64 "",
-                last_commit,
-                _db->GetLastFlushedDecree());
+        dcheck_gt_replica(last_commit, last_durable_decree());
+        int64_t last_flushed = static_cast<int64_t>(_db->GetLastFlushedDecree());
+        dcheck_eq_replica(last_commit, last_flushed);
         if (!_checkpoints.empty()) {
-            dassert(last_commit > _checkpoints.back(),
-                    "%" PRId64 " VS %" PRId64 "",
-                    last_commit,
-                    _checkpoints.back());
+            dcheck_gt_replica(last_commit, _checkpoints.back());
         }
         _checkpoints.push_back(last_commit);
         set_last_durable_decree(_checkpoints.back());
@@ -2309,6 +2321,15 @@ void pegasus_server_impl::update_app_envs(const std::map<std::string, std::strin
     _manual_compact_svc.start_manual_compact_if_needed(envs);
 }
 
+void pegasus_server_impl::update_app_envs_before_open_db(
+    const std::map<std::string, std::string> &envs)
+{
+    // we do not update usage scenario because it depends on opened db.
+    update_default_ttl(envs);
+    update_checkpoint_reserve(envs);
+    _manual_compact_svc.start_manual_compact_if_needed(envs);
+}
+
 void pegasus_server_impl::query_app_envs(/*out*/ std::map<std::string, std::string> &envs)
 {
     envs[ROCKSDB_ENV_USAGE_SCENARIO_KEY] = _usage_scenario;
@@ -2324,12 +2345,12 @@ void pegasus_server_impl::update_usage_scenario(const std::map<std::string, std:
     if (new_usage_scenario != _usage_scenario) {
         std::string old_usage_scenario = _usage_scenario;
         if (set_usage_scenario(new_usage_scenario)) {
-            ddebug_replica("update app env[{}] from {} to {} succeed",
+            ddebug_replica("update app env[{}] from \"{}\" to \"{}\" succeed",
                            ROCKSDB_ENV_USAGE_SCENARIO_KEY,
                            old_usage_scenario,
                            new_usage_scenario);
         } else {
-            derror_replica("update app env[{}] from {} to {} failed",
+            derror_replica("update app env[{}] from \"{}\" to \"{}\" failed",
                            ROCKSDB_ENV_USAGE_SCENARIO_KEY,
                            old_usage_scenario,
                            new_usage_scenario);
@@ -2372,14 +2393,14 @@ void pegasus_server_impl::update_checkpoint_reserve(const std::map<std::string, 
     }
 
     if (count != _checkpoint_reserve_min_count) {
-        ddebug_replica("update app env[{}] from {} to {} succeed",
+        ddebug_replica("update app env[{}] from \"{}\" to \"{}\" succeed",
                        ROCKDB_CHECKPOINT_RESERVE_MIN_COUNT,
                        _checkpoint_reserve_min_count,
                        count);
         _checkpoint_reserve_min_count = count;
     }
     if (time != _checkpoint_reserve_time_seconds) {
-        ddebug_replica("update app env[{}] from {} to {} succeed",
+        ddebug_replica("update app env[{}] from \"{}\" to \"{}\" succeed",
                        ROCKDB_CHECKPOINT_RESERVE_TIME_SECONDS,
                        _checkpoint_reserve_time_seconds,
                        time);
@@ -2469,6 +2490,7 @@ bool pegasus_server_impl::set_usage_scenario(const std::string &usage_scenario)
 {
     if (usage_scenario == _usage_scenario)
         return false;
+    std::string old_usage_scenario = _usage_scenario;
     std::unordered_map<std::string, std::string> new_options;
     if (usage_scenario == ROCKSDB_ENV_USAGE_SCENARIO_NORMAL ||
         usage_scenario == ROCKSDB_ENV_USAGE_SCENARIO_PREFER_WRITE) {
@@ -2541,10 +2563,12 @@ bool pegasus_server_impl::set_usage_scenario(const std::string &usage_scenario)
     }
     if (set_options(new_options)) {
         _usage_scenario = usage_scenario;
-        ddebug("%s: set usage scenario to %s succeed", replica_name(), usage_scenario.c_str());
+        ddebug_replica(
+            "set usage scenario from \"{}\" to \"{}\" succeed", old_usage_scenario, usage_scenario);
         return true;
     } else {
-        derror("%s: set usage scenario to %s failed", replica_name(), usage_scenario.c_str());
+        derror_replica(
+            "set usage scenario from \"{}\" to \"{}\" failed", old_usage_scenario, usage_scenario);
         return false;
     }
 }

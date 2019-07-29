@@ -6,11 +6,40 @@
 
 bool query_cluster_info(command_executor *e, shell_context *sc, arguments args)
 {
-    ::dsn::error_code err = sc->ddl_client->cluster_info("");
-    if (err == ::dsn::ERR_OK)
-        std::cout << "get cluster info succeed" << std::endl;
-    else
+    static struct option long_options[] = {{"resolve_ip", no_argument, 0, 'r'},
+                                           {"json", no_argument, 0, 'j'},
+                                           {"output", required_argument, 0, 'o'},
+                                           {0, 0, 0, 0}};
+
+    std::string out_file;
+    bool resolve_ip = false;
+    bool json = false;
+
+    optind = 0;
+    while (true) {
+        int option_index = 0;
+        int c = getopt_long(args.argc, args.argv, "rjo:", long_options, &option_index);
+        if (c == -1)
+            break;
+        switch (c) {
+        case 'r':
+            resolve_ip = true;
+            break;
+        case 'j':
+            json = true;
+            break;
+        case 'o':
+            out_file = optarg;
+            break;
+        default:
+            return false;
+        }
+    }
+
+    ::dsn::error_code err = sc->ddl_client->cluster_info(out_file, resolve_ip, json);
+    if (err != ::dsn::ERR_OK) {
         std::cout << "get cluster info failed, error=" << err.to_string() << std::endl;
+    }
     return true;
 }
 
@@ -19,6 +48,7 @@ bool ls_nodes(command_executor *e, shell_context *sc, arguments args)
     static struct option long_options[] = {{"detailed", no_argument, 0, 'd'},
                                            {"resolve_ip", no_argument, 0, 'r'},
                                            {"resource_usage", no_argument, 0, 'u'},
+                                           {"json", no_argument, 0, 'j'},
                                            {"status", required_argument, 0, 's'},
                                            {"output", required_argument, 0, 'o'},
                                            {0, 0, 0, 0}};
@@ -28,11 +58,12 @@ bool ls_nodes(command_executor *e, shell_context *sc, arguments args)
     bool detailed = false;
     bool resolve_ip = false;
     bool resource_usage = false;
+    bool json = false;
     optind = 0;
     while (true) {
         int option_index = 0;
         int c;
-        c = getopt_long(args.argc, args.argv, "drus:o:", long_options, &option_index);
+        c = getopt_long(args.argc, args.argv, "drujs:o:", long_options, &option_index);
         if (c == -1)
             break;
         switch (c) {
@@ -45,6 +76,9 @@ bool ls_nodes(command_executor *e, shell_context *sc, arguments args)
         case 'u':
             resource_usage = true;
             break;
+        case 'j':
+            json = true;
+            break;
         case 's':
             status = optarg;
             break;
@@ -56,16 +90,15 @@ bool ls_nodes(command_executor *e, shell_context *sc, arguments args)
         }
     }
 
+    dsn::utils::multi_table_printer mtp;
     if (!(status.empty() && output_file.empty())) {
-        std::cout << "[Parameters]" << std::endl;
-        dsn::utils::table_printer tp;
+        dsn::utils::table_printer tp("parameters");
         if (!status.empty())
             tp.add_row_name_and_data("status", status);
         if (!output_file.empty())
             tp.add_row_name_and_data("out_file", output_file);
-        tp.output(std::cout, ": ");
+        mtp.add(std::move(tp));
     }
-    std::cout << std::endl << "[Result]" << std::endl;
 
     ::dsn::replication::node_status::type s = ::dsn::replication::node_status::NS_INVALID;
     if (!status.empty() && status != "all") {
@@ -143,12 +176,13 @@ bool ls_nodes(command_executor *e, shell_context *sc, arguments args)
         }
 
         ::dsn::command command;
-        command.cmd = "perf-counters";
-        command.arguments.push_back(".*memused.res(MB)");
-        command.arguments.push_back(".*rdb.block_cache.memory_usage");
-        command.arguments.push_back(".*disk.available.total.ratio");
-        command.arguments.push_back(".*disk.available.min.ratio");
-        command.arguments.push_back(".*@.*");
+        command.cmd = "perf-counters-by-prefix";
+        command.arguments.push_back("replica*server*memused.res(MB)");
+        command.arguments.push_back("replica*app.pegasus*rdb.block_cache.memory_usage");
+        command.arguments.push_back("replica*eon.replica_stub*disk.available.total.ratio");
+        command.arguments.push_back("replica*eon.replica_stub*disk.available.min.ratio");
+        command.arguments.push_back("replica*app.pegasus*rdb.memtable.memory_usage");
+        command.arguments.push_back("replica*app.pegasus*rdb.index_and_filter_blocks.memory_usage");
         std::vector<std::pair<bool, std::string>> results;
         call_remote_command(sc, nodes, command, results);
 
@@ -177,25 +211,19 @@ bool ls_nodes(command_executor *e, shell_context *sc, arguments args)
             }
             list_nodes_helper &h = tmp_it->second;
             for (dsn::perf_counter_metric &m : info.counters) {
-                if (m.name == "replica*server*memused.res(MB)")
-                    h.memused_res_mb = m.value;
-                else if (m.name == "replica*app.pegasus*rdb.block_cache.memory_usage")
-                    h.block_cache_bytes = m.value;
-                else if (m.name == "replica*eon.replica_stub*disk.available.total.ratio")
-                    h.disk_available_total_ratio = m.value;
-                else if (m.name == "replica*eon.replica_stub*disk.available.min.ratio")
-                    h.disk_available_min_ratio = m.value;
-                else {
-                    int32_t app_id_x, partition_index_x;
-                    std::string counter_name;
-                    bool parse_ret = parse_app_pegasus_perf_counter_name(
-                        m.name, app_id_x, partition_index_x, counter_name);
-                    dassert(parse_ret, "name = %s", m.name.c_str());
-                    if (counter_name == "rdb.memtable.memory_usage")
-                        h.mem_tbl_bytes += m.value;
-                    else if (counter_name == "rdb.index_and_filter_blocks.memory_usage")
-                        h.mem_idx_bytes += m.value;
-                }
+                if (m.name.find("memused.res(MB)") != std::string::npos)
+                    h.memused_res_mb += m.value;
+                else if (m.name.find("rdb.block_cache.memory_usage") != std::string::npos)
+                    h.block_cache_bytes += m.value;
+                else if (m.name.find("disk.available.total.ratio") != std::string::npos)
+                    h.disk_available_total_ratio += m.value;
+                else if (m.name.find("disk.available.min.ratio") != std::string::npos)
+                    h.disk_available_min_ratio += m.value;
+                else if (m.name.find("rdb.memtable.memory_usage") != std::string::npos)
+                    h.mem_tbl_bytes += m.value;
+                else if (m.name.find("rdb.index_and_filter_blocks.memory_usage") !=
+                         std::string::npos)
+                    h.mem_idx_bytes += m.value;
             }
         }
     }
@@ -212,7 +240,7 @@ bool ls_nodes(command_executor *e, shell_context *sc, arguments args)
     }
     std::ostream out(buf);
 
-    dsn::utils::table_printer tp;
+    dsn::utils::table_printer tp("details");
     tp.add_title("address");
     tp.add_column("status");
     if (detailed) {
@@ -245,15 +273,15 @@ bool ls_nodes(command_executor *e, shell_context *sc, arguments args)
             tp.append_data(kv.second.disk_available_min_ratio);
         }
     }
-    tp.output(out);
-    out << std::endl;
+    mtp.add(std::move(tp));
 
-    dsn::utils::table_printer tp_count;
+    dsn::utils::table_printer tp_count("summary");
     tp_count.add_row_name_and_data("total_node_count", nodes.size());
     tp_count.add_row_name_and_data("alive_node_count", alive_node_count);
     tp_count.add_row_name_and_data("unalive_node_count", nodes.size() - alive_node_count);
-    tp_count.output(out, ": ");
-    out << std::endl;
+    mtp.add(std::move(tp_count));
+
+    mtp.output(out, json ? tp_output_format::kJsonPretty : tp_output_format::kTabular);
 
     return true;
 }

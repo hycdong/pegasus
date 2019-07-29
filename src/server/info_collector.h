@@ -23,6 +23,8 @@
 namespace pegasus {
 namespace server {
 
+class result_writer;
+
 class info_collector
 {
 public:
@@ -38,6 +40,8 @@ public:
         ::dsn::perf_counter_wrapper check_and_set_qps;
         ::dsn::perf_counter_wrapper check_and_mutate_qps;
         ::dsn::perf_counter_wrapper scan_qps;
+        ::dsn::perf_counter_wrapper recent_read_cu;
+        ::dsn::perf_counter_wrapper recent_write_cu;
         ::dsn::perf_counter_wrapper recent_expire_count;
         ::dsn::perf_counter_wrapper recent_filter_count;
         ::dsn::perf_counter_wrapper recent_abnormal_count;
@@ -62,16 +66,38 @@ public:
     void on_app_stat();
     AppStatCounters *get_app_counters(const std::string &app_name);
 
+    void on_capacity_unit_stat(int remaining_retry_count);
+    bool has_capacity_unit_updated(const std::string &node_address, const std::string &timestamp);
+
+    void on_storage_size_stat(int remaining_retry_count);
+
 private:
     dsn::task_tracker _tracker;
     ::dsn::rpc_address _meta_servers;
     std::string _cluster_name;
-
     shell_context _shell_context;
     uint32_t _app_stat_interval_seconds;
     ::dsn::task_ptr _app_stat_timer_task;
     ::dsn::utils::ex_lock_nr _app_stat_counter_lock;
     std::map<std::string, AppStatCounters *> _app_stat_counters;
+
+    // app for recording usage statistics, including read/write capacity unit and storage size.
+    std::string _usage_stat_app;
+    // client to access server.
+    pegasus_client *_client;
+    // for writing cu stat result
+    std::unique_ptr<result_writer> _result_writer;
+    uint32_t _capacity_unit_fetch_interval_seconds;
+    uint32_t _capacity_unit_retry_wait_seconds;
+    uint32_t _capacity_unit_retry_max_count;
+    ::dsn::task_ptr _capacity_unit_stat_timer_task;
+    uint32_t _storage_size_fetch_interval_seconds;
+    uint32_t _storage_size_retry_wait_seconds;
+    uint32_t _storage_size_retry_max_count;
+    ::dsn::task_ptr _storage_size_stat_timer_task;
+    ::dsn::utils::ex_lock_nr _capacity_unit_update_info_lock;
+    // mapping 'node address' --> 'last updated timestamp'
+    std::map<std::string, string> _capacity_unit_update_info;
 };
 } // namespace server
 } // namespace pegasus

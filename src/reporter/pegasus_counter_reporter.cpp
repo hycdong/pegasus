@@ -154,9 +154,9 @@ void pegasus_counter_reporter::update()
         oss << "logging perf counter(name, type, value):" << std::endl;
         oss << std::fixed << std::setprecision(2);
         perf_counters::instance().iterate_snapshot(
-            [&oss](const dsn::perf_counter_ptr &ptr, double val) {
-                oss << "[" << ptr->full_name() << ", " << dsn_counter_type_to_string(ptr->type())
-                    << ", " << val << "]" << std::endl;
+            [&oss](const dsn::perf_counters::counter_snapshot &cs) {
+                oss << "[" << cs.name << ", " << dsn_counter_type_to_string(cs.type) << ", "
+                    << cs.value << "]" << std::endl;
             });
         ddebug("%s", oss.str().c_str());
     }
@@ -168,9 +168,9 @@ void pegasus_counter_reporter::update()
         bool first_append = true;
         _falcon_metric.timestamp = timestamp;
         perf_counters::instance().iterate_snapshot(
-            [&oss, &first_append, this](const dsn::perf_counter_ptr &ptr, double val) {
-                _falcon_metric.metric = ptr->full_name();
-                _falcon_metric.value = val;
+            [&oss, &first_append, this](const dsn::perf_counters::counter_snapshot &cs) {
+                _falcon_metric.metric = cs.name;
+                _falcon_metric.value = cs.value;
                 _falcon_metric.counterType = "GAUGE";
                 if (!first_append)
                     oss << ",";
@@ -215,27 +215,23 @@ void pegasus_counter_reporter::http_request_done(struct evhttp_request *req, voi
 {
     struct event_base *event = (struct event_base *)arg;
     if (req == nullptr) {
-        derror("http_request_done failed, unknown reason");
-        event_base_loopexit(event, 0);
-        return;
-    }
-
-    switch (req->response_code) {
-    case HTTP_OK: {
-        dinfo("http_request_done OK");
-        event_base_loopexit(event, 0);
-    } break;
-
-    default:
+        derror("http post request failed: unknown reason");
+    } else if (req->response_code == 0) {
+        derror("http post request failed: connection refused");
+    } else if (req->response_code == HTTP_OK) {
+        dinfo("http post request succeed");
+    } else {
         struct evbuffer *buf = evhttp_request_get_input_buffer(req);
         size_t len = evbuffer_get_length(buf);
         char *tmp = (char *)alloca(len + 1);
         memcpy(tmp, evbuffer_pullup(buf, -1), len);
         tmp[len] = '\0';
-        derror("http post request receive ERROR: %u, %s", req->response_code, tmp);
-        event_base_loopexit(event, 0);
-        return;
+        derror("http post request failed: code = %u, code_line = %s, input_buffer = %s",
+               req->response_code,
+               req->response_code_line,
+               tmp);
     }
+    event_base_loopexit(event, 0);
 }
 
 void pegasus_counter_reporter::on_report_timer(std::shared_ptr<boost::asio::deadline_timer> timer,

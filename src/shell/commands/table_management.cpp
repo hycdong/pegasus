@@ -8,19 +8,21 @@ bool ls_apps(command_executor *e, shell_context *sc, arguments args)
 {
     static struct option long_options[] = {{"all", no_argument, 0, 'a'},
                                            {"detailed", no_argument, 0, 'd'},
+                                           {"json", no_argument, 0, 'j'},
                                            {"status", required_argument, 0, 's'},
                                            {"output", required_argument, 0, 'o'},
                                            {0, 0, 0, 0}};
 
     bool show_all = false;
     bool detailed = false;
+    bool json = false;
     std::string status;
     std::string output_file;
     optind = 0;
     while (true) {
         int option_index = 0;
         int c;
-        c = getopt_long(args.argc, args.argv, "ads:o:", long_options, &option_index);
+        c = getopt_long(args.argc, args.argv, "adjs:o:", long_options, &option_index);
         if (c == -1)
             break;
         switch (c) {
@@ -29,6 +31,9 @@ bool ls_apps(command_executor *e, shell_context *sc, arguments args)
             break;
         case 'd':
             detailed = true;
+            break;
+        case 'j':
+            json = true;
             break;
         case 's':
             status = optarg;
@@ -50,10 +55,8 @@ bool ls_apps(command_executor *e, shell_context *sc, arguments args)
                       "parse %s as app_status::type failed",
                       status.c_str());
     }
-    ::dsn::error_code err = sc->ddl_client->list_apps(s, show_all, detailed, output_file);
-    if (err == ::dsn::ERR_OK)
-        std::cout << "list apps succeed" << std::endl;
-    else
+    ::dsn::error_code err = sc->ddl_client->list_apps(s, show_all, detailed, json, output_file);
+    if (err != ::dsn::ERR_OK)
         std::cout << "list apps failed, error=" << err.to_string() << std::endl;
     return true;
 }
@@ -63,23 +66,34 @@ bool query_app(command_executor *e, shell_context *sc, arguments args)
     if (args.argc <= 1)
         return false;
 
-    static struct option long_options[] = {
-        {"detailed", no_argument, 0, 'd'}, {"output", required_argument, 0, 'o'}, {0, 0, 0, 0}};
+    static struct option long_options[] = {{"detailed", no_argument, 0, 'd'},
+                                           {"resolve_ip", no_argument, 0, 'r'},
+                                           {"output", required_argument, 0, 'o'},
+                                           {"json", no_argument, 0, 'j'},
+                                           {0, 0, 0, 0}};
 
     std::string app_name = args.argv[1];
     std::string out_file;
     bool detailed = false;
+    bool resolve_ip = false;
+    bool json = false;
 
     optind = 0;
     while (true) {
         int option_index = 0;
         int c;
-        c = getopt_long(args.argc, args.argv, "do:", long_options, &option_index);
+        c = getopt_long(args.argc, args.argv, "dro:j", long_options, &option_index);
         if (c == -1)
             break;
         switch (c) {
         case 'd':
             detailed = true;
+            break;
+        case 'r':
+            resolve_ip = true;
+            break;
+        case 'j':
+            json = true;
             break;
         case 'o':
             out_file = optarg;
@@ -89,29 +103,16 @@ bool query_app(command_executor *e, shell_context *sc, arguments args)
         }
     }
 
-    dsn::utils::table_printer tp;
-    if (!(app_name.empty() && out_file.empty())) {
-        std::cout << "[Parameters]" << std::endl;
-        if (!app_name.empty())
-            tp.add_row_name_and_data("app_name", app_name);
-        if (!out_file.empty())
-            tp.add_row_name_and_data("out_file", out_file);
-    }
-    tp.add_row_name_and_data("detailed", detailed);
-    tp.output(std::cout, ": ");
-
-    std::cout << std::endl << "[Result]" << std::endl;
-
     if (app_name.empty()) {
         std::cout << "ERROR: null app name" << std::endl;
         return false;
     }
+
     ::dsn::error_code err =
-        sc->ddl_client->list_app(app_name, detailed, out_file); // TODO resolve ip
-    if (err == ::dsn::ERR_OK)
-        std::cout << "list app " << app_name << " succeed" << std::endl;
-    else
-        std::cout << "list app " << app_name << " failed, error=" << err.to_string() << std::endl;
+        sc->ddl_client->list_app(app_name, detailed, json, out_file, resolve_ip);
+    if (err != ::dsn::ERR_OK) {
+        std::cout << "query app " << app_name << " failed, error=" << err.to_string() << std::endl;
+    }
     return true;
 }
 
@@ -120,23 +121,29 @@ bool app_disk(command_executor *e, shell_context *sc, arguments args)
     if (args.argc <= 1)
         return false;
 
-    static struct option long_options[] = {
-        {"detailed", no_argument, 0, 'd'}, {"output", required_argument, 0, 'o'}, {0, 0, 0, 0}};
+    static struct option long_options[] = {{"detailed", no_argument, 0, 'd'},
+                                           {"json", no_argument, 0, 'j'},
+                                           {"output", required_argument, 0, 'o'},
+                                           {0, 0, 0, 0}};
 
     std::string app_name = args.argv[1];
     std::string out_file;
     bool detailed = false;
+    bool json = false;
 
     optind = 0;
     while (true) {
         int option_index = 0;
         int c;
-        c = getopt_long(args.argc, args.argv, "do:", long_options, &option_index);
+        c = getopt_long(args.argc, args.argv, "djo:", long_options, &option_index);
         if (c == -1)
             break;
         switch (c) {
         case 'd':
             detailed = true;
+            break;
+        case 'j':
+            json = true;
             break;
         case 'o':
             out_file = optarg;
@@ -146,23 +153,32 @@ bool app_disk(command_executor *e, shell_context *sc, arguments args)
         }
     }
 
-    dsn::utils::table_printer tp_params;
+    if (app_name.empty()) {
+        std::cout << "ERROR: null app name" << std::endl;
+        return false;
+    }
+
+    std::streambuf *buf;
+    std::ofstream of;
+
+    if (!out_file.empty()) {
+        of.open(out_file);
+        buf = of.rdbuf();
+    } else {
+        buf = std::cout.rdbuf();
+    }
+    std::ostream out(buf);
+
+    dsn::utils::multi_table_printer mtp;
+    dsn::utils::table_printer tp_params("parameters");
     if (!(app_name.empty() && out_file.empty())) {
-        std::cout << "[Parameters]" << std::endl;
         if (!app_name.empty())
             tp_params.add_row_name_and_data("app_name", app_name);
         if (!out_file.empty())
             tp_params.add_row_name_and_data("out_file", out_file);
     }
     tp_params.add_row_name_and_data("detailed", detailed);
-    tp_params.output(std::cout, ": ");
-
-    std::cout << std::endl << "[Result]" << std::endl;
-
-    if (app_name.empty()) {
-        std::cout << "ERROR: null app name" << std::endl;
-        return false;
-    }
+    mtp.add(std::move(tp_params));
 
     int32_t app_id = 0;
     int32_t partition_count = 0;
@@ -185,9 +201,11 @@ bool app_disk(command_executor *e, shell_context *sc, arguments args)
     }
 
     ::dsn::command command;
-    command.cmd = "perf-counters";
+    command.cmd = "perf-counters-by-prefix";
     char tmp[256];
-    sprintf(tmp, ".*\\*app\\.pegasus\\*disk\\.storage\\.sst.*@%d\\..*", app_id);
+    sprintf(tmp, "replica*app.pegasus*disk.storage.sst(MB)@%d.", app_id);
+    command.arguments.push_back(tmp);
+    sprintf(tmp, "replica*app.pegasus*disk.storage.sst.count@%d.", app_id);
     command.arguments.push_back(tmp);
     std::vector<std::pair<bool, std::string>> results;
     call_remote_command(sc, nodes, command, results);
@@ -226,25 +244,13 @@ bool app_disk(command_executor *e, shell_context *sc, arguments args)
         }
     }
 
-    // print configuration_query_by_index_response
-    std::streambuf *buf;
-    std::ofstream of;
-
-    if (!out_file.empty()) {
-        of.open(out_file);
-        buf = of.rdbuf();
-    } else {
-        buf = std::cout.rdbuf();
-    }
-    std::ostream out(buf);
-
-    ::dsn::utils::table_printer tp_general;
+    ::dsn::utils::table_printer tp_general("result");
     tp_general.add_row_name_and_data("app_name", app_name);
     tp_general.add_row_name_and_data("app_id", app_id);
     tp_general.add_row_name_and_data("partition_count", partition_count);
     tp_general.add_row_name_and_data("max_replica_count", max_replica_count);
 
-    ::dsn::utils::table_printer tp_details;
+    ::dsn::utils::table_printer tp_details("details");
     if (detailed) {
         tp_details.add_title("pidx");
         tp_details.add_column("ballot");
@@ -369,22 +375,19 @@ bool app_disk(command_executor *e, shell_context *sc, arguments args)
     tp_general.add_row_name_and_data("disk_used_for_primary_replicas(MB)",
                                      disk_used_for_primary_replicas);
     tp_general.add_row_name_and_data("disk_used_for_all_replicas(MB)", disk_used_for_all_replicas);
-    tp_general.output(out, ": ");
+    tp_general.add_row_name_and_data("partitions not counted",
+                                     std::to_string(partition_count - primary_replicas_count) +
+                                         "/" + std::to_string(partition_count));
+    tp_general.add_row_name_and_data(
+        "replicas not counted",
+        std::to_string(partition_count * max_replica_count - all_replicas_count) + "/" +
+            std::to_string(partition_count * max_replica_count));
+    mtp.add(std::move(tp_general));
     if (detailed) {
-        out << "details" << std::endl;
-        tp_details.output(out);
+        mtp.add(std::move(tp_details));
     }
-    out << std::endl;
+    mtp.output(out, json ? tp_output_format::kJsonPretty : tp_output_format::kTabular);
 
-    if (primary_replicas_count < partition_count) {
-        out << " (" << (partition_count - primary_replicas_count) << "/" << partition_count
-            << " partitions not counted)" << std::endl;
-    }
-    if (all_replicas_count < partition_count * max_replica_count) {
-        out << " (" << (partition_count * max_replica_count - all_replicas_count) << "/"
-            << (partition_count * max_replica_count) << " replicas not counted)" << std::endl;
-    }
-    std::cout << "list disk usage for app " << app_name << " succeed" << std::endl;
     return true;
 }
 
@@ -393,6 +396,7 @@ bool app_stat(command_executor *e, shell_context *sc, arguments args)
     static struct option long_options[] = {{"app_name", required_argument, 0, 'a'},
                                            {"only_qps", required_argument, 0, 'q'},
                                            {"only_usage", required_argument, 0, 'u'},
+                                           {"json", no_argument, 0, 'j'},
                                            {"output", required_argument, 0, 'o'},
                                            {0, 0, 0, 0}};
 
@@ -400,12 +404,13 @@ bool app_stat(command_executor *e, shell_context *sc, arguments args)
     std::string out_file;
     bool only_qps = false;
     bool only_usage = false;
+    bool json = false;
 
     optind = 0;
     while (true) {
         int option_index = 0;
         int c;
-        c = getopt_long(args.argc, args.argv, "a:quo:", long_options, &option_index);
+        c = getopt_long(args.argc, args.argv, "a:qujo:", long_options, &option_index);
         if (c == -1)
             break;
         switch (c) {
@@ -417,6 +422,9 @@ bool app_stat(command_executor *e, shell_context *sc, arguments args)
             break;
         case 'u':
             only_usage = true;
+            break;
+        case 'j':
+            json = true;
             break;
         case 'o':
             out_file = optarg;
@@ -454,6 +462,8 @@ bool app_stat(command_executor *e, shell_context *sc, arguments args)
         sum.check_and_set_qps += row.check_and_set_qps;
         sum.check_and_mutate_qps += row.check_and_mutate_qps;
         sum.scan_qps += row.scan_qps;
+        sum.recent_read_cu += row.recent_read_cu;
+        sum.recent_write_cu += row.recent_write_cu;
         sum.recent_expire_count += row.recent_expire_count;
         sum.recent_filter_count += row.recent_filter_count;
         sum.recent_abnormal_count += row.recent_abnormal_count;
@@ -478,7 +488,7 @@ bool app_stat(command_executor *e, shell_context *sc, arguments args)
     }
     std::ostream out(buf);
 
-    ::dsn::utils::table_printer tp;
+    ::dsn::utils::table_printer tp("app_stat");
     tp.add_title(app_name.empty() ? "app_name" : "pidx");
     if (app_name.empty()) {
         tp.add_column("app_id", tp_alignment::kRight);
@@ -495,6 +505,8 @@ bool app_stat(command_executor *e, shell_context *sc, arguments args)
         tp.add_column("CAS", tp_alignment::kRight);
         tp.add_column("CAM", tp_alignment::kRight);
         tp.add_column("SCAN", tp_alignment::kRight);
+        tp.add_column("RCU", tp_alignment::kRight);
+        tp.add_column("WCU", tp_alignment::kRight);
         tp.add_column("expire", tp_alignment::kRight);
         tp.add_column("filter", tp_alignment::kRight);
         tp.add_column("abnormal", tp_alignment::kRight);
@@ -506,8 +518,8 @@ bool app_stat(command_executor *e, shell_context *sc, arguments args)
         tp.add_column("file_num", tp_alignment::kRight);
         tp.add_column("mem_tbl_mb", tp_alignment::kRight);
         tp.add_column("mem_idx_mb", tp_alignment::kRight);
-        tp.add_column("hit_rate", tp_alignment::kRight);
     }
+    tp.add_column("hit_rate", tp_alignment::kRight);
 
     for (row_data &row : rows) {
         tp.add_row(row.row_name);
@@ -526,6 +538,8 @@ bool app_stat(command_executor *e, shell_context *sc, arguments args)
             tp.append_data(row.check_and_set_qps);
             tp.append_data(row.check_and_mutate_qps);
             tp.append_data(row.scan_qps);
+            tp.append_data(row.recent_read_cu);
+            tp.append_data(row.recent_write_cu);
             tp.append_data(row.recent_expire_count);
             tp.append_data(row.recent_filter_count);
             tp.append_data(row.recent_abnormal_count);
@@ -537,20 +551,15 @@ bool app_stat(command_executor *e, shell_context *sc, arguments args)
             tp.append_data((uint64_t)row.storage_count);
             tp.append_data(row.rdb_memtable_mem_usage / (1 << 20U));
             tp.append_data(row.rdb_index_and_filter_blocks_mem_usage / (1 << 20U));
-            double block_cache_hit_rate =
-                std::abs(row.rdb_block_cache_total_count) < 1e-6
-                    ? 0.0
-                    : row.rdb_block_cache_hit_count / row.rdb_block_cache_total_count;
-            tp.append_data(block_cache_hit_rate);
         }
+        double block_cache_hit_rate =
+            std::abs(row.rdb_block_cache_total_count) < 1e-6
+                ? 0.0
+                : row.rdb_block_cache_hit_count / row.rdb_block_cache_total_count;
+        tp.append_data(block_cache_hit_rate);
     }
-    tp.output(out);
+    tp.output(out, json ? tp_output_format::kJsonPretty : tp_output_format::kTabular);
 
-    std::cout << std::endl;
-    if (app_name.empty())
-        std::cout << "list statistics for apps succeed" << std::endl;
-    else
-        std::cout << "list statistics for app " << app_name << " succeed" << std::endl;
     return true;
 }
 
@@ -673,13 +682,26 @@ bool recall_app(command_executor *e, shell_context *sc, arguments args)
 
 bool get_app_envs(command_executor *e, shell_context *sc, arguments args)
 {
+    static struct option long_options[] = {{"json", no_argument, 0, 'j'}, {0, 0, 0, 0}};
+    bool json = false;
+    optind = 0;
+    while (true) {
+        int option_index = 0;
+        int c = getopt_long(args.argc, args.argv, "j", long_options, &option_index);
+        if (c == -1)
+            break;
+        switch (c) {
+        case 'j':
+            json = true;
+            break;
+        default:
+            return false;
+        }
+    }
+
     if (sc->current_app_name.empty()) {
         fprintf(stderr, "No app is using now\nUSAGE: use [app_name]\n");
         return true;
-    }
-
-    if (args.argc != 1) {
-        return false;
     }
 
     std::map<std::string, std::string> envs;
@@ -689,13 +711,11 @@ bool get_app_envs(command_executor *e, shell_context *sc, arguments args)
         return true;
     }
 
-    std::cout << "get app envs succeed, count = " << envs.size() << std::endl;
-    if (!envs.empty()) {
-        std::cout << "=================================" << std::endl;
-        for (auto &kv : envs)
-            std::cout << kv.first << " = " << kv.second << std::endl;
-        std::cout << "=================================" << std::endl;
+    ::dsn::utils::table_printer tp("app_envs");
+    for (auto &kv : envs) {
+        tp.add_row_name_and_data(kv.first, kv.second);
     }
+    tp.output(std::cout, json ? tp_output_format::kJsonPretty : tp_output_format::kTabular);
 
     return true;
 }
