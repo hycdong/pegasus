@@ -181,6 +181,16 @@ int pegasus_write_service::check_and_mutate(int64_t decree,
     return err;
 }
 
+int pegasus_write_service::ingestion_files(int64_t decree,
+                                           const dsn::replication::ingestion_request &req,
+                                           dsn::replication::ingestion_response &resp)
+{
+    int err = _impl->ingestion_files(decree, _server->bulk_load_dir(), req, resp);
+    // TODO(heyuchen): add perf-counter
+    // TODO(heyuchen): consider cu
+    return err;
+}
+
 void pegasus_write_service::batch_prepare(int64_t decree)
 {
     dassert(_batch_start_time == 0,

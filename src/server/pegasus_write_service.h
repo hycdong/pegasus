@@ -6,6 +6,7 @@
 
 #include <dsn/perf_counter/perf_counter_wrapper.h>
 #include <dsn/dist/replication/replica_base.h>
+#include <dsn/dist/replication/replication_types.h>
 
 #include "base/pegasus_value_schema.h"
 #include "base/pegasus_utils.h"
@@ -55,6 +56,11 @@ public:
     int check_and_mutate(int64_t decree,
                          const dsn::apps::check_and_mutate_request &update,
                          dsn::apps::check_and_mutate_response &resp);
+
+    // Execute rocksdb ingestion
+    int ingestion_files(int64_t decree,
+                        const dsn::replication::ingestion_request &req,
+                        dsn::replication::ingestion_response &resp);
 
     /// For batch write.
     /// NOTE: A batch write may incur a database read for consistency check of timetag.

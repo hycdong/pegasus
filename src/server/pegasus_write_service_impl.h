@@ -12,6 +12,8 @@
 
 #include <dsn/utility/fail_point.h>
 #include <dsn/utility/string_conv.h>
+// TODO(heyuchen): may be useless further
+#include <dsn/utility/filesystem.h>
 
 namespace pegasus {
 namespace server {
@@ -456,6 +458,41 @@ public:
 
         clear_up_batch_states(decree, resp.error);
         return 0;
+    }
+
+    int ingestion_files(int64_t decree,
+                        const std::string &external_file_dir,
+                        const dsn::replication::ingestion_request &req,
+                        dsn::replication::ingestion_response &resp)
+    {
+        // write empty put to flush ingestion request decree
+        resp.error = empty_put(decree);
+        if (resp.error) {
+            derror_replica("empty put failed, err={}, decree={}", resp.error, decree);
+            return resp.error;
+        }
+
+        // TODO(heyuchen): get file name from request
+        std::vector<std::string> sst_file_list;
+        dsn::utils::filesystem::get_subfiles(external_file_dir, sst_file_list, false);
+        for (int i = 0; i < sst_file_list.size(); ++i) {
+            if (sst_file_list[i].find(".sst") == std::string::npos) {
+                sst_file_list.erase(sst_file_list.begin() + i);
+            }
+        }
+
+        rocksdb::IngestExternalFileOptions ifo;
+        rocksdb::Status s = _db->IngestExternalFile(sst_file_list, ifo);
+        if (!s.ok()) {
+            derror_rocksdb("IngestExternalFile",
+                           "Failed to ingest files, error={}, decree={}",
+                           s.ToString(),
+                           decree);
+        } else {
+            ddebug_rocksdb("IngestExternalFile", "Ingest files succeed, decree={}", decree);
+        }
+
+        return resp.error;
     }
 
     /// For batch write.
