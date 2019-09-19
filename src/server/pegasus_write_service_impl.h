@@ -484,14 +484,11 @@ public:
         rocksdb::IngestExternalFileOptions ifo;
         rocksdb::Status s = _db->IngestExternalFile(sst_file_list, ifo);
         if (!s.ok()) {
-            derror_rocksdb("IngestExternalFile",
-                           "Failed to ingest files, error={}, decree={}",
-                           s.ToString(),
-                           decree);
+            derror_rocksdb("IngestExternalFile", s.ToString(), "decree={}", decree);
         } else {
             ddebug_rocksdb("IngestExternalFile", "Ingest files succeed, decree={}", decree);
         }
-
+        resp.error = s.code();
         return resp.error;
     }
 
