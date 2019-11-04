@@ -5,6 +5,7 @@
 #include "pegasus_write_service.h"
 #include "pegasus_write_service_impl.h"
 #include "capacity_unit_calculator.h"
+#include <dsn/utility/filesystem.h>
 
 namespace pegasus {
 namespace server {
@@ -181,16 +182,6 @@ int pegasus_write_service::check_and_mutate(int64_t decree,
     return err;
 }
 
-int pegasus_write_service::ingestion_files(int64_t decree,
-                                           const dsn::replication::ingestion_request &req,
-                                           dsn::replication::ingestion_response &resp)
-{
-    int err = _impl->ingestion_files(decree, _server->bulk_load_dir(), req, resp);
-    // TODO(heyuchen): add perf-counter
-    // TODO(heyuchen): consider cu
-    return err;
-}
-
 void pegasus_write_service::batch_prepare(int64_t decree)
 {
     dassert(_batch_start_time == 0,
@@ -264,6 +255,16 @@ void pegasus_write_service::clear_up_batch_states()
     _batch_qps_perfcounters.clear();
     _batch_latency_perfcounters.clear();
     _batch_start_time = 0;
+}
+
+int pegasus_write_service::ingestion_files(int64_t decree,
+                                           const dsn::replication::ingestion_request &req,
+                                           dsn::replication::ingestion_response &resp)
+{
+    int err = _impl->ingestion_files(decree, _server->bulk_load_dir(), req, resp);
+    // TODO(heyuchen): add perf-counter
+    // TODO(heyuchen): consider cu
+    return err;
 }
 
 } // namespace server

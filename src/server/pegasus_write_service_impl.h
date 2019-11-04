@@ -461,35 +461,37 @@ public:
     }
 
     int ingestion_files(int64_t decree,
-                        const std::string &external_file_dir,
+                        const std::string bulk_load_dir,
                         const dsn::replication::ingestion_request &req,
                         dsn::replication::ingestion_response &resp)
     {
-        // write empty put to flush ingestion request decree
-        resp.error = empty_put(decree);
-        if (resp.error) {
-            derror_replica("empty put failed, err={}, decree={}", resp.error, decree);
-            return resp.error;
+        resp.err = dsn::ERR_OK;
+        // write empty put to flush decree
+        resp.rocksdb_error = empty_put(decree);
+        if (resp.rocksdb_error) {
+            derror_replica("empty put failed, err={}, decree={}", resp.rocksdb_error, decree);
+            return resp.rocksdb_error;
         }
 
-        // TODO(heyuchen): get file name from request
+        // verify external files
         std::vector<std::string> sst_file_list;
-        dsn::utils::filesystem::get_subfiles(external_file_dir, sst_file_list, false);
-        for (int i = 0; i < sst_file_list.size(); ++i) {
-            if (sst_file_list[i].find(".sst") == std::string::npos) {
-                sst_file_list.erase(sst_file_list.begin() + i);
-            }
+        resp.err = get_external_files_path(bulk_load_dir, sst_file_list, req.metadata);
+        if (resp.err != dsn::ERR_OK) {
+            return 0;
         }
 
+        // ingest external files
         rocksdb::IngestExternalFileOptions ifo;
         rocksdb::Status s = _db->IngestExternalFile(sst_file_list, ifo);
         if (!s.ok()) {
             derror_rocksdb("IngestExternalFile", s.ToString(), "decree={}", decree);
+            resp.err = dsn::ERR_INGESTION_FAILED;
         } else {
             ddebug_rocksdb("IngestExternalFile", "Ingest files succeed, decree={}", decree);
+            resp.err = dsn::ERR_OK;
         }
-        resp.error = s.code();
-        return resp.error;
+        resp.rocksdb_error = s.code();
+        return resp.rocksdb_error;
     }
 
     /// For batch write.
@@ -730,6 +732,53 @@ private:
         }
 
         return expire_ts;
+    }
+
+    dsn::error_code get_external_files_path(const std::string bulk_load_dir,
+                                            std::vector<std::string> &files_path,
+                                            const dsn::replication::bulk_load_metadata &metadata)
+    {
+        for (auto iter = metadata.files.begin(); iter != metadata.files.end(); ++iter) {
+            std::string file_path;
+            if (!verify_external_file(bulk_load_dir, *iter, file_path)) {
+                break;
+            } else {
+                files_path.emplace_back(file_path);
+            }
+        }
+        return files_path.size() == metadata.files.size() ? dsn::ERR_OK : dsn::ERR_WRONG_CHECKSUM;
+    }
+
+    bool verify_external_file(const std::string bulk_load_dir,
+                              const dsn::replication::file_meta &f_meta,
+                              std::string &file_path)
+    {
+        file_path = dsn::utils::filesystem::path_combine(bulk_load_dir, f_meta.name);
+        if (!dsn::utils::filesystem::file_exists(file_path)) {
+            derror_f("file({}) is not existed", file_path);
+            return false;
+        }
+        int64_t file_sz = 0;
+        std::string md5;
+        if (!::dsn::utils::filesystem::file_size(file_path, file_sz)) {
+            derror_f("get file({}) size failed", file_path);
+            return false;
+        }
+        if (::dsn::utils::filesystem::md5sum(file_path, md5) != dsn::ERR_OK) {
+            derror_f("get file({}) md5 failed", file_path);
+            return false;
+        }
+        if (file_sz != f_meta.size || md5 != f_meta.md5) {
+            derror_f("file({}) is damaged, local file md5={}, request file md5={}, local file "
+                     "size={}, request file size={}",
+                     file_path,
+                     md5,
+                     f_meta.md5,
+                     file_sz,
+                     f_meta.size);
+            return false;
+        }
+        return true;
     }
 
 private:
