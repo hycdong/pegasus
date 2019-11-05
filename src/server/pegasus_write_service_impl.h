@@ -12,7 +12,6 @@
 
 #include <dsn/utility/fail_point.h>
 #include <dsn/utility/string_conv.h>
-// TODO(heyuchen): may be useless further
 #include <dsn/utility/filesystem.h>
 
 namespace pegasus {
