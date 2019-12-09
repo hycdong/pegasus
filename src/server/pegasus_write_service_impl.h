@@ -464,6 +464,9 @@ public:
                         const dsn::replication::ingestion_request &req,
                         dsn::replication::ingestion_response &resp)
     {
+        // TODO(heyuchen): delete it
+        ddebug_rocksdb("IngestExternalFile", "start write empty put, decree={}", decree);
+
         resp.err = dsn::ERR_OK;
         // write empty put to flush decree
         resp.rocksdb_error = empty_put(decree);
@@ -472,12 +475,18 @@ public:
             return resp.rocksdb_error;
         }
 
+        // TODO(heyuchen): delete it
+        ddebug_rocksdb("IngestExternalFile", "start verify sst files, decree={}", decree);
+
         // verify external files
         std::vector<std::string> sst_file_list;
         resp.err = get_external_files_path(bulk_load_dir, sst_file_list, req.metadata);
         if (resp.err != dsn::ERR_OK) {
             return 0;
         }
+
+        // TODO(heyuchen): delete it
+        ddebug_rocksdb("IngestExternalFile", "start rocksdb ingest files, decree={}", decree);
 
         // ingest external files
         rocksdb::IngestExternalFileOptions ifo;
