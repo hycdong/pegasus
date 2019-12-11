@@ -459,30 +459,18 @@ public:
         return 0;
     }
 
-    int ingestion_files(int64_t decree,
-                        const std::string bulk_load_dir,
-                        const dsn::replication::ingestion_request &req,
-                        dsn::replication::ingestion_response &resp)
+    dsn::error_code ingestion_files(const int64_t decree,
+                                    const std::string bulk_load_dir,
+                                    const dsn::replication::bulk_load_metadata metadata)
     {
-        // TODO(heyuchen): delete it
-        ddebug_rocksdb("IngestExternalFile", "start write empty put, decree={}", decree);
-
-        resp.err = dsn::ERR_OK;
-        // write empty put to flush decree
-        resp.rocksdb_error = empty_put(decree);
-        if (resp.rocksdb_error) {
-            derror_replica("empty put failed, err={}, decree={}", resp.rocksdb_error, decree);
-            return resp.rocksdb_error;
-        }
-
         // TODO(heyuchen): delete it
         ddebug_rocksdb("IngestExternalFile", "start verify sst files, decree={}", decree);
 
         // verify external files
         std::vector<std::string> sst_file_list;
-        resp.err = get_external_files_path(bulk_load_dir, sst_file_list, req.metadata);
-        if (resp.err != dsn::ERR_OK) {
-            return 0;
+        dsn::error_code err = get_external_files_path(bulk_load_dir, sst_file_list, metadata);
+        if (err != dsn::ERR_OK) {
+            return err;
         }
 
         // TODO(heyuchen): delete it
@@ -493,13 +481,11 @@ public:
         rocksdb::Status s = _db->IngestExternalFile(sst_file_list, ifo);
         if (!s.ok()) {
             derror_rocksdb("IngestExternalFile", s.ToString(), "decree={}", decree);
-            resp.err = dsn::ERR_INGESTION_FAILED;
+            return dsn::ERR_INGESTION_FAILED;
         } else {
             ddebug_rocksdb("IngestExternalFile", "Ingest files succeed, decree={}", decree);
-            resp.err = dsn::ERR_OK;
+            return dsn::ERR_OK;
         }
-        resp.rocksdb_error = s.code();
-        return resp.rocksdb_error;
     }
 
     /// For batch write.

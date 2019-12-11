@@ -55,7 +55,9 @@ pegasus_server_impl::pegasus_server_impl(dsn::replication::replica *r)
       _value_schema_version(0),
       _last_durable_decree(0),
       _is_checkpointing(false),
-      _manual_compact_svc(this)
+      _manual_compact_svc(this),
+      _partition_version(0),
+      _ingestion_status(dsn::replication::ingestion_status::IS_INVALID)
 {
     _primary_address = dsn::rpc_address(dsn_primary_address()).to_string();
     _gpid = get_gpid();
@@ -2691,6 +2693,18 @@ bool pegasus_server_impl::release_storage_after_manual_compact()
 std::string pegasus_server_impl::query_compact_state() const
 {
     return _manual_compact_svc.query_compact_state();
+}
+
+void pegasus_server_impl::set_partition_version(int32_t partition_version)
+{
+    ddebug_replica("partition version from {} to {}", _partition_version.load(), partition_version);
+    _partition_version.store(partition_version);
+}
+
+void pegasus_server_impl::set_ingestion_status(dsn::replication::ingestion_status::type status)
+{
+    ddebug_replica("ingestion status from {} to {}", _ingestion_status, status);
+    _ingestion_status = status;
 }
 
 } // namespace server

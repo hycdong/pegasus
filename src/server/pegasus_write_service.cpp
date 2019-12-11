@@ -5,10 +5,14 @@
 #include "pegasus_write_service.h"
 #include "pegasus_write_service_impl.h"
 #include "capacity_unit_calculator.h"
+
+#include <dsn/dist/replication/replication.codes.h>
 #include <dsn/utility/filesystem.h>
 
 namespace pegasus {
 namespace server {
+
+DEFINE_TASK_CODE(LPC_INGESTION, TASK_PRIORITY_COMMON, THREAD_POOL_INGESTION)
 
 pegasus_write_service::pegasus_write_service(pegasus_server_impl *server)
     : _server(server),
@@ -261,10 +265,30 @@ int pegasus_write_service::ingestion_files(int64_t decree,
                                            const dsn::replication::ingestion_request &req,
                                            dsn::replication::ingestion_response &resp)
 {
-    int err = _impl->ingestion_files(decree, _server->bulk_load_dir(), req, resp);
     // TODO(heyuchen): add perf-counter
     // TODO(heyuchen): consider cu
-    return err;
+
+    resp.err = dsn::ERR_OK;
+    // write empty put to flush decree
+    resp.rocksdb_error = empty_put(decree);
+    if (resp.rocksdb_error != 0) {
+        resp.err = dsn::ERR_TRY_AGAIN;
+        return resp.rocksdb_error;
+    }
+
+    _server->set_ingestion_status(::dsn::replication::ingestion_status::IS_RUNNING);
+
+    dsn::tasking::enqueue(LPC_INGESTION, &_server->_tracker, [this, decree, req]() {
+        dsn::error_code err =
+            _impl->ingestion_files(decree, _server->bulk_load_dir(), req.metadata);
+        if (err == dsn::ERR_OK) {
+            _server->set_ingestion_status(::dsn::replication::ingestion_status::IS_SUCCEED);
+        } else {
+            _server->set_ingestion_status(::dsn::replication::ingestion_status::IS_FAILED);
+        }
+    });
+
+    return rocksdb::Status::kOk;
 }
 
 } // namespace server
