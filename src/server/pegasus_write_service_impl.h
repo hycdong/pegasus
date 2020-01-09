@@ -463,18 +463,12 @@ public:
                                     const std::string bulk_load_dir,
                                     const dsn::replication::bulk_load_metadata metadata)
     {
-        // TODO(heyuchen): delete it
-        ddebug_rocksdb("IngestExternalFile", "start verify sst files, decree={}", decree);
-
         // verify external files
         std::vector<std::string> sst_file_list;
         dsn::error_code err = get_external_files_path(bulk_load_dir, sst_file_list, metadata);
         if (err != dsn::ERR_OK) {
             return err;
         }
-
-        // TODO(heyuchen): delete it
-        ddebug_rocksdb("IngestExternalFile", "start rocksdb ingest files, decree={}", decree);
 
         // ingest external files
         rocksdb::IngestExternalFileOptions ifo;
