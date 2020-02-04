@@ -179,7 +179,6 @@ pegasus_server_impl::pegasus_server_impl(dsn::replication::replica *r)
     dassert(parse_compression_types(compression_str, _db_opts.compression_per_level),
             "parse rocksdb_compression_type failed.");
 
-
     if (dsn_config_get_value_bool("pegasus.server",
                                   "rocksdb_disable_table_block_cache",
                                   false,
@@ -2342,6 +2341,18 @@ void pegasus_server_impl::update_usage_scenario(const std::map<std::string, std:
                            old_usage_scenario,
                            new_usage_scenario);
         }
+    }
+}
+
+void pegasus_server_impl::update_default_ttl(const std::map<std::string, std::string> &envs)
+{
+    auto find = envs.find(TABLE_LEVEL_DEFAULT_TTL);
+    if (find != envs.end()) {
+        int32_t ttl = 0;
+        if (!dsn::buf2int32(find->second, ttl) || ttl < 0) {
+            derror_replica("{}={} is invalid.", find->first, find->second);
+            return;
+        }
         _server_write->set_default_ttl(static_cast<uint32_t>(ttl));
         _key_ttl_compaction_filter_factory->SetDefaultTTL(static_cast<uint32_t>(ttl));
     }
@@ -2405,134 +2416,6 @@ void pegasus_server_impl::update_slow_query_threshold(
                        _slow_query_threshold_ns,
                        threshold_ns);
         _slow_query_threshold_ns = threshold_ns;
-    }
-}
-
-bool pegasus_server_impl::parse_compression_types(
-    const std::string &config, std::vector<rocksdb::CompressionType> &compression_per_level)
-{
-    std::vector<rocksdb::CompressionType> tmp(_db_opts.num_levels, rocksdb::kNoCompression);
-    size_t i = config.find(COMPRESSION_HEADER);
-    if (i != std::string::npos) {
-        // New compression config style.
-        // 'per_level:[none|snappy|zstd|lz4],[none|snappy|zstd|lz4],...' for each level 0,1,...
-        // The last compression type will be used for levels not specified in the list.
-        std::vector<std::string> compression_types;
-        dsn::utils::split_args(
-            config.substr(COMPRESSION_HEADER.length()).c_str(), compression_types, ',');
-        rocksdb::CompressionType last_type = rocksdb::kNoCompression;
-        for (int i = 0; i < _db_opts.num_levels; ++i) {
-            if (i < compression_types.size()) {
-                if (!compression_str_to_type(compression_types[i], last_type)) {
-                    return false;
-                }
-            }
-            tmp[i] = last_type;
-        }
-    } else {
-        // Old compression config style.
-        // '[none|snappy|zstd|lz4]' for all level 2 and higher levels
-        rocksdb::CompressionType compression;
-        if (!compression_str_to_type(config, compression)) {
-            return false;
-        }
-        if (compression != rocksdb::kNoCompression) {
-            // only compress levels >= 2
-            // refer to ColumnFamilyOptions::OptimizeLevelStyleCompaction()
-            for (int i = 0; i < _db_opts.num_levels; ++i) {
-                if (i >= 2) {
-                    tmp[i] = compression;
-                }
-            }
-        }
-    }
-
-    compression_per_level = tmp;
-    return true;
-}
-
-bool pegasus_server_impl::compression_str_to_type(const std::string &compression_str,
-                                                  rocksdb::CompressionType &type)
-{
-    if (compression_str == "none") {
-        type = rocksdb::kNoCompression;
-    } else if (compression_str == "snappy") {
-        type = rocksdb::kSnappyCompression;
-    } else if (compression_str == "lz4") {
-        type = rocksdb::kLZ4Compression;
-    } else if (compression_str == "zstd") {
-        type = rocksdb::kZSTD;
-    } else {
-        derror_replica("Unsupported compression type: {}.", compression_str);
-        return false;
-    }
-    return true;
-}
-
-std::string pegasus_server_impl::compression_type_to_str(rocksdb::CompressionType type)
-{
-    switch (type) {
-    case rocksdb::kNoCompression:
-        return "none";
-    case rocksdb::kSnappyCompression:
-        return "snappy";
-    case rocksdb::kLZ4Compression:
-        return "lz4";
-    case rocksdb::kZSTD:
-        return "zstd";
-    default:
-        derror_replica("Unsupported compression type: {}.", type);
-        return "<unsupported>";
-    }
-}
-
-void pegasus_server_impl::update_default_ttl(const std::map<std::string, std::string> &envs)
-{
-    auto find = envs.find(TABLE_LEVEL_DEFAULT_TTL);
-    if (find != envs.end()) {
-        int32_t ttl = 0;
-        if (!dsn::buf2int32(find->second, ttl) || ttl < 0) {
-            derror_replica("{}={} is invalid.", find->first, find->second);
-            return;
-        }
-        _server_write->set_default_ttl(static_cast<uint32_t>(ttl));
-        _key_ttl_compaction_filter_factory->SetDefaultTTL(static_cast<uint32_t>(ttl));
-    }
-}
-
-void pegasus_server_impl::update_checkpoint_reserve(const std::map<std::string, std::string> &envs)
-{
-    int32_t count = _checkpoint_reserve_min_count_in_config;
-    int32_t time = _checkpoint_reserve_time_seconds_in_config;
-
-    auto find = envs.find(ROCKDB_CHECKPOINT_RESERVE_MIN_COUNT);
-    if (find != envs.end()) {
-        if (!dsn::buf2int32(find->second, count) || count <= 0) {
-            derror_replica("{}={} is invalid.", find->first, find->second);
-            return;
-        }
-    }
-    find = envs.find(ROCKDB_CHECKPOINT_RESERVE_TIME_SECONDS);
-    if (find != envs.end()) {
-        if (!dsn::buf2int32(find->second, time) || time < 0) {
-            derror_replica("{}={} is invalid.", find->first, find->second);
-            return;
-        }
-    }
-
-    if (count != _checkpoint_reserve_min_count) {
-        ddebug_replica("update app env[{}] from \"{}\" to \"{}\" succeed",
-                       ROCKDB_CHECKPOINT_RESERVE_MIN_COUNT,
-                       _checkpoint_reserve_min_count,
-                       count);
-        _checkpoint_reserve_min_count = count;
-    }
-    if (time != _checkpoint_reserve_time_seconds) {
-        ddebug_replica("update app env[{}] from \"{}\" to \"{}\" succeed",
-                       ROCKDB_CHECKPOINT_RESERVE_TIME_SECONDS,
-                       _checkpoint_reserve_time_seconds,
-                       time);
-        _checkpoint_reserve_time_seconds = time;
     }
 }
 
