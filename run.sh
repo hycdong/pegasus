@@ -208,7 +208,9 @@ function run_build()
 
     echo "INFO: start build rocksdb..."
     ROCKSDB_BUILD_DIR="$ROOT/rocksdb/build"
-    CMAKE_OPTIONS="-DCMAKE_C_COMPILER=$C_COMPILER -DCMAKE_CXX_COMPILER=$CXX_COMPILER -DWITH_LZ4=ON -DWITH_ZSTD=ON -DWITH_SNAPPY=ON -DWITH_BZ2=OFF -DCMAKE_CXX_FLAGS=-g"
+    ROCKSDB_BUILD_OUTPUT="$ROCKSDB_BUILD_DIR/output"
+    CMAKE_OPTIONS="-DCMAKE_C_COMPILER=$C_COMPILER -DCMAKE_CXX_COMPILER=$CXX_COMPILER -DWITH_LZ4=ON -DWITH_ZSTD=ON -DWITH_SNAPPY=ON -DWITH_BZ2=OFF -DWITH_TESTS=OFF"
+
     if [ "$WARNING_ALL" == "YES" ]
     then
         echo "WARNING_ALL=YES"
@@ -252,7 +254,7 @@ function run_build()
         mkdir -p $ROCKSDB_BUILD_DIR
         cd $ROCKSDB_BUILD_DIR
         echo "$CMAKE_OPTIONS" >CMAKE_OPTIONS
-        cmake .. -DCMAKE_INSTALL_PREFIX=$ROCKSDB_BUILD_DIR $CMAKE_OPTIONS
+        cmake .. -DCMAKE_INSTALL_PREFIX=$ROCKSDB_BUILD_OUTPUT $CMAKE_OPTIONS
         if [ $? -ne 0 ]; then
             echo "ERROR: cmake failed"
             exit 1
@@ -307,11 +309,13 @@ function usage_test()
     echo "   -h|--help         print the help info"
     echo "   -m|--modules      set the test modules: pegasus_unit_test pegasus_function_test"
     echo "   -k|--keep_onebox  whether keep the onebox after the test[default false]"
+    echo "   --on_travis       run tests on travis without some time-cosuming function tests"
 }
 function run_test()
 {
     local test_modules=""
     local clear_flags="1"
+    local on_traivs=""
     while [[ $# > 0 ]]; do
         key="$1"
         case $key in
@@ -325,6 +329,9 @@ function run_test()
                 ;;
             -k|--keep_onebox)
                 clear_flags=""
+                ;;
+            --on_travis)
+                on_travis="--on_travis"
                 ;;
             *)
                 echo "Error: unknow option \"$key\""
@@ -348,7 +355,7 @@ function run_test()
 
     for module in `echo $test_modules`; do
         pushd $ROOT/src/builder/bin/$module
-        REPORT_DIR=$REPORT_DIR ./run.sh
+        REPORT_DIR=$REPORT_DIR ./run.sh $on_travis
         if [ $? != 0 ]; then
             echo "run test \"$module\" in `pwd` failed"
             exit 1
@@ -517,7 +524,7 @@ function usage_start_onebox()
     echo "   -s|--server_path <str>"
     echo "                     server binary path, default is ${DSN_ROOT}/bin/pegasus_server"
     echo "   --config_path"
-    echo "                     specify the config template path, default is ./src/server/config-server.ini in non-production env"
+    echo "                     specify the config template path, default is ./src/server/config.min.ini in non-production env"
     echo "                                                                  ./src/server/config.ini in production env"
     echo "   --use_product_config"
     echo "                     use the product config template"
@@ -530,7 +537,7 @@ function run_start_onebox()
     COLLECTOR_COUNT=0
     APP_NAME=temp
     PARTITION_COUNT=8
-    WAIT_HEALHY=false
+    WAIT_HEALTHY=false
     SERVER_PATH=${DSN_ROOT}/bin/pegasus_server
     CONFIG_FILE=""
     USE_PRODUCT_CONFIG=false
@@ -562,7 +569,7 @@ function run_start_onebox()
                 shift
                 ;;
             -w|--wait_healthy)
-                WAIT_HEALHY=true
+                WAIT_HEALTHY=true
                 ;;
             -s|--server_path)
                 SERVER_PATH="$2"
@@ -624,7 +631,7 @@ function run_start_onebox()
         sed -i 's/app_name = .*$/app_name = '"$APP_NAME"'/' ${ROOT}/config-server.ini
         sed -i 's/partition_count = .*$/partition_count = '"$PARTITION_COUNT"'/' ${ROOT}/config-server.ini
     else
-        [ -z "${CONFIG_FILE}" ] && CONFIG_FILE=${ROOT}/src/server/config-server.ini
+        [ -z "${CONFIG_FILE}" ] && CONFIG_FILE=${ROOT}/src/server/config.min.ini
         [ ! -f "${CONFIG_FILE}" ] && { echo "${CONFIG_FILE} is not exist"; exit 1; }
         sed "s/@LOCAL_IP@/${LOCAL_IP}/g;s/@APP_NAME@/${APP_NAME}/g;s/@PARTITION_COUNT@/${PARTITION_COUNT}/g" \
             ${CONFIG_FILE} >${ROOT}/config-server.ini
@@ -674,7 +681,7 @@ function run_start_onebox()
         cd ..
     fi
 
-    if [ $WAIT_HEALHY == "true" ]; then
+    if [ $WAIT_HEALTHY == "true" ]; then
         cd $ROOT
         echo "Wait cluster to become healthy..."
         sleeped=0
@@ -1490,30 +1497,49 @@ function run_clear_upgrade_test()
 function usage_bench()
 {
     echo "Options for subcommand 'bench':"
-    echo "   -h|--help            print the help info"
-    echo "   -t|--type            benchmark type, supporting:"
-    echo "                          fillseq_pegasus, fillrandom_pegasus, readrandom_pegasus, filluniquerandom_pegasus,"
-    echo "                          deleteseq_pegasus,deleterandom_pegasus,multi_set_pegasus,scan_pegasus"
-    echo "                        default is fillseq_pegasus,readrandom_pegasus"
-    echo "   -n <num>             number of key/value pairs, default 100000"
-    echo "   --cluster <str>      cluster meta lists, default '127.0.0.1:34601,127.0.0.1:34602,127.0.0.1:34603'"
-    echo "   --app_name <str>     app name, default 'temp'"
-    echo "   --thread_num <num>   number of threads, default 1"
-    echo "   --key_size <num>     key size, default 16"
-    echo "   --value_size <num>   value size, default 100"
-    echo "   --timeout <num>      timeout in milliseconds, default 1000"
+    echo "   -h|--help                 print the help info"
+    echo "   --type                    benchmark type, supporting:"
+    echo "                             fillrandom_pegasus       --pegasus write N random values with random keys list"
+    echo "                             readrandom_pegasus       --pegasus read N times with random keys list"
+    echo "                             deleterandom_pegasus     --pegasus delete N entries with random keys list"
+    echo "                             Comma-separated list of operations is going to run in the specified order."
+    echo "                             default is 'fillrandom_pegasus,readrandom_pegasus,deleterandom_pegasus'"
+    echo "   --num <num>               number of key/value pairs, default is 10000"
+    echo "   --cluster <str>           cluster meta lists, default is '127.0.0.1:34601,127.0.0.1:34602,127.0.0.1:34603'"
+    echo "   --app_name <str>          app name, default is 'temp'"
+    echo "   --thread_num <num>        number of threads, default is 1"
+    echo "   --hashkey_size <num>      hashkey size in bytes, default is 16"
+    echo "   --sortkey_size <num>      sortkey size in bytes, default is 16"
+    echo "   --value_size <num>        value size in bytes, default is 100"
+    echo "   --timeout <num>           timeout in milliseconds, default is 1000"
+    echo "   --seed <num>              seed base for random number generator, When 0 it is specified as 1000. default is 1000"
+}
+
+function fill_bench_config() {
+    sed -i "s/@TYPE@/$TYPE/g" ./config-bench.ini
+    sed -i "s/@NUM@/$NUM/g" ./config-bench.ini
+    sed -i "s/@CLUSTER@/$CLUSTER/g" ./config-bench.ini
+    sed -i "s/@APP@/$APP/g" ./config-bench.ini
+    sed -i "s/@THREAD@/$THREAD/g" ./config-bench.ini
+    sed -i "s/@HASHKEY_SIZE@/$HASHKEY_SIZE/g" ./config-bench.ini
+    sed -i "s/@SORTKEY_SIZE@/$SORTKEY_SIZE/g" ./config-bench.ini
+    sed -i "s/@VALUE_SIZE@/$VALUE_SIZE/g" ./config-bench.ini
+    sed -i "s/@TIMEOUT_MS@/$TIMEOUT_MS/g" ./config-bench.ini
+    sed -i "s/@SEED@/$SEED/g" ./config-bench.ini
 }
 
 function run_bench()
 {
-    TYPE=fillseq_pegasus,readrandom_pegasus
-    NUM=100000
+    TYPE=fillrandom_pegasus,readrandom_pegasus,deleterandom_pegasus
+    NUM=10000
     CLUSTER=127.0.0.1:34601,127.0.0.1:34602,127.0.0.1:34603
     APP=temp
     THREAD=1
-    KEY_SIZE=16
+    HASHKEY_SIZE=16
+    SORTKEY_SIZE=16
     VALUE_SIZE=100
     TIMEOUT_MS=1000
+    SEED=1000
     while [[ $# > 0 ]]; do
         key="$1"
         case $key in
@@ -1521,11 +1547,11 @@ function run_bench()
                 usage_bench
                 exit 0
                 ;;
-            -t|--type)
+            --type)
                 TYPE="$2"
                 shift
                 ;;
-            -n)
+            --num)
                 NUM="$2"
                 shift
                 ;;
@@ -1541,8 +1567,12 @@ function run_bench()
                 THREAD="$2"
                 shift
                 ;;
-            --key_size)
-                KEY_SIZE="$2"
+            --hashkey_size)
+                HASHKEY_SIZE="$2"
+                shift
+                ;;
+            --sortkey_size)
+                SORTKEY_SIZE="$2"
                 shift
                 ;;
             --value_size)
@@ -1551,6 +1581,10 @@ function run_bench()
                 ;;
             --timeout)
                 TIMEOUT_MS="$2"
+                shift
+                ;;
+            --seed)
+                SEED="$2"
                 shift
                 ;;
             *)
@@ -1562,14 +1596,12 @@ function run_bench()
         esac
         shift
     done
-
     cd ${ROOT}
-    sed -i "s/@CLUSTER@/$CLUSTER/g" ${DSN_ROOT}/bin/pegasus_bench/config.ini
+    cp ${DSN_ROOT}/bin/pegasus_bench/config.ini ./config-bench.ini
+    fill_bench_config
     ln -s -f ${DSN_ROOT}/bin/pegasus_bench/pegasus_bench
-    ./pegasus_bench --pegasus_config=${DSN_ROOT}/bin/pegasus_bench/config.ini --benchmarks=${TYPE} --pegasus_timeout_ms=${TIMEOUT_MS} \
-        --key_size=${KEY_SIZE} --value_size=${VALUE_SIZE} --threads=${THREAD} --num=${NUM} \
-        --pegasus_cluster_name=mycluster --pegasus_app_name=${APP} --stats_interval=1000 --histogram=1 \
-        --compression_ratio=1.0
+    ./pegasus_bench ./config-bench.ini
+    rm -f ./config-bench.ini
 }
 
 #####################

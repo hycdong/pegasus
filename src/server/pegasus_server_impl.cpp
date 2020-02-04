@@ -52,7 +52,7 @@ pegasus_server_impl::pegasus_server_impl(dsn::replication::replica *r)
     : dsn::apps::rrdb_service(r),
       _db(nullptr),
       _is_open(false),
-      _value_schema_version(0),
+      _pegasus_data_version(0),
       _last_durable_decree(0),
       _is_checkpointing(false),
       _manual_compact_svc(this),
@@ -61,142 +61,129 @@ pegasus_server_impl::pegasus_server_impl(dsn::replication::replica *r)
 {
     _primary_address = dsn::rpc_address(dsn_primary_address()).to_string();
     _gpid = get_gpid();
+
     _verbose_log = dsn_config_get_value_bool("pegasus.server",
                                              "rocksdb_verbose_log",
                                              false,
-                                             "print verbose log for debugging, default is false");
-    _abnormal_get_time_threshold_ns = dsn_config_get_value_uint64(
+                                             "whether to print verbose log for debugging");
+    _slow_query_threshold_ns_in_config = dsn_config_get_value_uint64(
         "pegasus.server",
-        "rocksdb_abnormal_get_time_threshold_ns",
-        0,
-        "rocksdb_abnormal_get_time_threshold_ns, default is 0, means no check");
+        "rocksdb_slow_query_threshold_ns",
+        100000000,
+        "get/multi-get operation duration exceed this threshold will be logged");
+    _slow_query_threshold_ns = _slow_query_threshold_ns_in_config;
+    dassert(_slow_query_threshold_ns > 0, "slow query threshold must be greater than 0");
     _abnormal_get_size_threshold = dsn_config_get_value_uint64(
         "pegasus.server",
         "rocksdb_abnormal_get_size_threshold",
-        0,
-        "rocksdb_abnormal_get_size_threshold, default is 0, means no check");
-    _abnormal_multi_get_time_threshold_ns = dsn_config_get_value_uint64(
-        "pegasus.server",
-        "rocksdb_abnormal_multi_get_time_threshold_ns",
-        0,
-        "rocksdb_abnormal_multi_get_time_threshold_ns, default is 0, means no check");
-    _abnormal_multi_get_size_threshold = dsn_config_get_value_uint64(
-        "pegasus.server",
-        "rocksdb_abnormal_multi_get_size_threshold",
-        0,
-        "rocksdb_abnormal_multi_get_size_threshold, default is 0, means no check");
+        1000000,
+        "get operation value size exceed this threshold will be logged, 0 means no check");
+    _abnormal_multi_get_size_threshold =
+        dsn_config_get_value_uint64("pegasus.server",
+                                    "rocksdb_abnormal_multi_get_size_threshold",
+                                    10000000,
+                                    "multi-get operation total key-value size exceed this "
+                                    "threshold will be logged, 0 means no check");
     _abnormal_multi_get_iterate_count_threshold = dsn_config_get_value_uint64(
         "pegasus.server",
         "rocksdb_abnormal_multi_get_iterate_count_threshold",
-        0,
-        "rocksdb_abnormal_multi_get_iterate_count_threshold, default is 0, means no check");
+        1000,
+        "multi-get operation iterate count exceed this threshold will be logged, 0 means no check");
 
     // init db options
+    _db_opts.pegasus_data = true;
 
     // read rocksdb::Options configurations
-    // rocksdb default: 4MB
     _db_opts.write_buffer_size =
         (size_t)dsn_config_get_value_uint64("pegasus.server",
                                             "rocksdb_write_buffer_size",
                                             64 * 1024 * 1024,
-                                            "rocksdb options.write_buffer_size, default 64MB");
+                                            "rocksdb options.write_buffer_size");
 
-    // rocksdb default: 2
     _db_opts.max_write_buffer_number =
         (int)dsn_config_get_value_int64("pegasus.server",
                                         "rocksdb_max_write_buffer_number",
-                                        6,
-                                        "rocksdb options.max_write_buffer_number, default 6");
+                                        3,
+                                        "rocksdb options.max_write_buffer_number");
 
-    // rocksdb default: -1
     // flush threads are shared among all rocksdb instances in one process.
     _db_opts.max_background_flushes =
         (int)dsn_config_get_value_int64("pegasus.server",
                                         "rocksdb_max_background_flushes",
                                         4,
-                                        "rocksdb options.max_background_flushes, default 4");
+                                        "rocksdb options.max_background_flushes");
 
-    // rocksdb default: -1
     // compaction threads are shared among all rocksdb instances in one process.
     _db_opts.max_background_compactions =
         (int)dsn_config_get_value_int64("pegasus.server",
                                         "rocksdb_max_background_compactions",
                                         12,
-                                        "rocksdb options.max_background_compactions, default 12");
+                                        "rocksdb options.max_background_compactions");
 
-    // rocksdb default: 7
     _db_opts.num_levels = (int)dsn_config_get_value_int64(
-        "pegasus.server", "rocksdb_num_levels", 7, "rocksdb options.num_levels, default 7");
+        "pegasus.server", "rocksdb_num_levels", 6, "rocksdb options.num_levels");
 
-    // rocksdb default: 2MB
     _db_opts.target_file_size_base =
         dsn_config_get_value_uint64("pegasus.server",
                                     "rocksdb_target_file_size_base",
                                     64 * 1024 * 1024,
-                                    "rocksdb options.target_file_size_base, default 64MB");
+                                    "rocksdb options.target_file_size_base");
 
-    // rocksdb default: 1
     _db_opts.target_file_size_multiplier =
         (int)dsn_config_get_value_int64("pegasus.server",
                                         "rocksdb_target_file_size_multiplier",
                                         1,
-                                        "rocksdb options.target_file_size_multiplier, default 1");
+                                        "rocksdb options.target_file_size_multiplier");
 
-    // rocksdb default: 10MB
     _db_opts.max_bytes_for_level_base =
         dsn_config_get_value_uint64("pegasus.server",
                                     "rocksdb_max_bytes_for_level_base",
                                     10 * 64 * 1024 * 1024,
-                                    "rocksdb options.max_bytes_for_level_base, default 640MB");
+                                    "rocksdb options.max_bytes_for_level_base");
 
-    // rocksdb default: 10
-    _db_opts.max_bytes_for_level_multiplier = dsn_config_get_value_double(
-        "pegasus.server",
-        "rocksdb_max_bytes_for_level_multiplier",
-        10,
-        "rocksdb options.rocksdb_max_bytes_for_level_multiplier, default 10");
+    _db_opts.max_bytes_for_level_multiplier =
+        dsn_config_get_value_double("pegasus.server",
+                                    "rocksdb_max_bytes_for_level_multiplier",
+                                    10,
+                                    "rocksdb options.rocksdb_max_bytes_for_level_multiplier");
 
     // we need set max_compaction_bytes definitely because set_usage_scenario() depends on it.
     _db_opts.max_compaction_bytes = _db_opts.target_file_size_base * 25;
 
-    // rocksdb default: 4
     _db_opts.level0_file_num_compaction_trigger =
         (int)dsn_config_get_value_int64("pegasus.server",
                                         "rocksdb_level0_file_num_compaction_trigger",
                                         4,
-                                        "rocksdb options.level0_file_num_compaction_trigger, 4");
+                                        "rocksdb options.level0_file_num_compaction_trigger");
 
-    // rocksdb default: 20
     _db_opts.level0_slowdown_writes_trigger = (int)dsn_config_get_value_int64(
         "pegasus.server",
         "rocksdb_level0_slowdown_writes_trigger",
         30,
         "rocksdb options.level0_slowdown_writes_trigger, default 30");
 
-    // rocksdb default: 24
     _db_opts.level0_stop_writes_trigger =
         (int)dsn_config_get_value_int64("pegasus.server",
                                         "rocksdb_level0_stop_writes_trigger",
                                         60,
-                                        "rocksdb options.level0_stop_writes_trigger, default 60");
+                                        "rocksdb options.level0_stop_writes_trigger");
 
-    // rocksdb default: snappy
     std::string compression_str = dsn_config_get_value_string(
         "pegasus.server",
         "rocksdb_compression_type",
-        "snappy",
-        "rocksdb options.compression, default 'snappy'. Available config: '[none|snappy|zstd|lz4]' "
+        "lz4",
+        "rocksdb options.compression. Available config: '[none|snappy|zstd|lz4]' "
         "for all level 2 and higher levels, and "
         "'per_level:[none|snappy|zstd|lz4],[none|snappy|zstd|lz4],...' for each level 0,1,..., the "
         "last compression type will be used for levels not specified in the list.");
     dassert(parse_compression_types(compression_str, _db_opts.compression_per_level),
             "parse rocksdb_compression_type failed.");
 
-    // disable table block cache, default: false
+
     if (dsn_config_get_value_bool("pegasus.server",
                                   "rocksdb_disable_table_block_cache",
                                   false,
-                                  "rocksdb tbl_opts.no_block_cache, default false")) {
+                                  "rocksdb tbl_opts.no_block_cache")) {
         _tbl_opts.no_block_cache = true;
         _tbl_opts.block_restart_interval = 4;
     } else {
@@ -205,7 +192,6 @@ pegasus_server_impl::pegasus_server_impl(dsn::replication::replica *r)
         // algorithm used by the block cache object can be more efficient in this way.
         static std::once_flag flag;
         std::call_once(flag, [&]() {
-            // block cache capacity, default 10G
             uint64_t capacity = dsn_config_get_value_uint64(
                 "pegasus.server",
                 "rocksdb_block_cache_capacity",
@@ -227,11 +213,10 @@ pegasus_server_impl::pegasus_server_impl(dsn::replication::replica *r)
         _tbl_opts.block_cache = _block_cache;
     }
 
-    // disable bloom filter, default: false
     if (!dsn_config_get_value_bool("pegasus.server",
                                    "rocksdb_disable_bloom_filter",
                                    false,
-                                   "rocksdb tbl_opts.filter_policy, default nullptr")) {
+                                   "rocksdb tbl_opts.filter_policy")) {
         _tbl_opts.filter_policy.reset(rocksdb::NewBloomFilterPolicy(10, false));
     }
 
@@ -250,12 +235,12 @@ pegasus_server_impl::pegasus_server_impl(dsn::replication::replica *r)
 
     // get the checkpoint reserve options.
     _checkpoint_reserve_min_count_in_config = (uint32_t)dsn_config_get_value_uint64(
-        "pegasus.server", "checkpoint_reserve_min_count", 3, "checkpoint_reserve_min_count");
+        "pegasus.server", "checkpoint_reserve_min_count", 2, "checkpoint_reserve_min_count");
     _checkpoint_reserve_min_count = _checkpoint_reserve_min_count_in_config;
     _checkpoint_reserve_time_seconds_in_config =
         (uint32_t)dsn_config_get_value_uint64("pegasus.server",
                                               "checkpoint_reserve_time_seconds",
-                                              0,
+                                              1800,
                                               "checkpoint_reserve_time_seconds, 0 means no check");
     _checkpoint_reserve_time_seconds = _checkpoint_reserve_time_seconds_in_config;
 
@@ -583,29 +568,31 @@ void pegasus_server_impl::on_get(const ::dsn::blob &key,
         }
     }
 
-    if (_abnormal_get_time_threshold_ns || _abnormal_get_size_threshold) {
-        uint64_t time_used = dsn_now_ns() - start_time;
-        if ((_abnormal_get_time_threshold_ns && time_used >= _abnormal_get_time_threshold_ns) ||
-            (_abnormal_get_size_threshold && value.size() >= _abnormal_get_size_threshold)) {
-            ::dsn::blob hash_key, sort_key;
-            pegasus_restore_key(key, hash_key, sort_key);
-            dwarn("%s: rocksdb abnormal get from %s: "
-                  "hash_key = \"%s\", sort_key = \"%s\", return = %s, "
-                  "value_size = %d, time_used = %" PRIu64 " ns",
-                  replica_name(),
-                  reply.to_address().to_string(),
-                  ::pegasus::utils::c_escape_string(hash_key).c_str(),
-                  ::pegasus::utils::c_escape_string(sort_key).c_str(),
-                  status.ToString().c_str(),
-                  (int)value.size(),
-                  time_used);
-            _pfc_recent_abnormal_count->increment();
-        }
+#ifdef PEGASUS_UNIT_TEST
+    // sleep 10ms for unit test,
+    // so when we set slow_query_threshold <= 10ms, it will be a slow query
+    usleep(10 * 1000);
+#endif
+
+    uint64_t time_used = dsn_now_ns() - start_time;
+    if (is_get_abnormal(time_used, value.size())) {
+        ::dsn::blob hash_key, sort_key;
+        pegasus_restore_key(key, hash_key, sort_key);
+        dwarn_replica("rocksdb abnormal get from {}: "
+                      "hash_key = {}, sort_key = {}, return = {}, "
+                      "value_size = {}, time_used = {} ns",
+                      reply.to_address().to_string(),
+                      ::pegasus::utils::c_escape_string(hash_key),
+                      ::pegasus::utils::c_escape_string(sort_key),
+                      status.ToString(),
+                      value.size(),
+                      time_used);
+        _pfc_recent_abnormal_count->increment();
     }
 
     resp.error = status.code();
     if (status.ok()) {
-        pegasus_extract_user_data(_value_schema_version, std::move(value), resp.value);
+        pegasus_extract_user_data(_pegasus_data_version, std::move(value), resp.value);
     }
 
     _cu_calculator->add_get_cu(resp.error, resp.value);
@@ -893,7 +880,7 @@ void pegasus_server_impl::on_multi_get(const ::dsn::apps::multi_get_request &req
             }
             // check ttl
             if (status.ok()) {
-                uint32_t expire_ts = pegasus_extract_expire_ts(_value_schema_version, value);
+                uint32_t expire_ts = pegasus_extract_expire_ts(_pegasus_data_version, value);
                 if (expire_ts > 0 && expire_ts <= epoch_now) {
                     expire_count++;
                     if (_verbose_log) {
@@ -914,7 +901,7 @@ void pegasus_server_impl::on_multi_get(const ::dsn::apps::multi_get_request &req
                 ::dsn::apps::key_value kv;
                 kv.key = request.sort_keys[i];
                 if (!request.no_value) {
-                    pegasus_extract_user_data(_value_schema_version, std::move(value), kv.value);
+                    pegasus_extract_user_data(_pegasus_data_version, std::move(value), kv.value);
                 }
                 count++;
                 size += kv.key.length() + kv.value.length();
@@ -938,42 +925,38 @@ void pegasus_server_impl::on_multi_get(const ::dsn::apps::multi_get_request &req
         }
     }
 
-    if (_abnormal_multi_get_time_threshold_ns || _abnormal_multi_get_size_threshold ||
-        _abnormal_multi_get_iterate_count_threshold) {
-        uint64_t time_used = dsn_now_ns() - start_time;
-        if ((_abnormal_multi_get_time_threshold_ns &&
-             time_used >= _abnormal_multi_get_time_threshold_ns) ||
-            (_abnormal_multi_get_size_threshold &&
-             (uint64_t)size >= _abnormal_multi_get_size_threshold) ||
-            (_abnormal_multi_get_iterate_count_threshold &&
-             (uint64_t)iterate_count >= _abnormal_multi_get_iterate_count_threshold)) {
-            dwarn("%s: rocksdb abnormal multi_get from %s: hash_key = \"%s\", "
-                  "start_sort_key = \"%s\" (%s), stop_sort_key = \"%s\" (%s), "
-                  "sort_key_filter_type = %s, sort_key_filter_pattern = \"%s\", "
-                  "max_kv_count = %d, max_kv_size = %d, reverse = %s, "
-                  "result_count = %d, result_size = %" PRId64 ", iterate_count = %d, "
-                  "expire_count = %d, filter_count = %d, time_used = %" PRIu64 " ns",
-                  replica_name(),
-                  reply.to_address().to_string(),
-                  ::pegasus::utils::c_escape_string(request.hash_key).c_str(),
-                  ::pegasus::utils::c_escape_string(request.start_sortkey).c_str(),
-                  request.start_inclusive ? "inclusive" : "exclusive",
-                  ::pegasus::utils::c_escape_string(request.stop_sortkey).c_str(),
-                  request.stop_inclusive ? "inclusive" : "exclusive",
-                  ::dsn::apps::_filter_type_VALUES_TO_NAMES.find(request.sort_key_filter_type)
-                      ->second,
-                  ::pegasus::utils::c_escape_string(request.sort_key_filter_pattern).c_str(),
-                  request.max_kv_count,
-                  request.max_kv_size,
-                  request.reverse ? "true" : "false",
-                  count,
-                  size,
-                  iterate_count,
-                  expire_count,
-                  filter_count,
-                  time_used);
-            _pfc_recent_abnormal_count->increment();
-        }
+#ifdef PEGASUS_UNIT_TEST
+    // sleep 10ms for unit test
+    usleep(10 * 1000);
+#endif
+
+    uint64_t time_used = dsn_now_ns() - start_time;
+    if (is_multi_get_abnormal(time_used, size, iterate_count)) {
+        dwarn_replica(
+            "rocksdb abnormal multi_get from {}: hash_key = {}, "
+            "start_sort_key = {} ({}), stop_sort_key = {} ({}), "
+            "sort_key_filter_type = {}, sort_key_filter_pattern = {}, "
+            "max_kv_count = {}, max_kv_size = {}, reverse = {}, "
+            "result_count = {}, result_size = {}, iterate_count = {}, "
+            "expire_count = {}, filter_count = {}, time_used = {} ns",
+            reply.to_address().to_string(),
+            ::pegasus::utils::c_escape_string(request.hash_key),
+            ::pegasus::utils::c_escape_string(request.start_sortkey),
+            request.start_inclusive ? "inclusive" : "exclusive",
+            ::pegasus::utils::c_escape_string(request.stop_sortkey),
+            request.stop_inclusive ? "inclusive" : "exclusive",
+            ::dsn::apps::_filter_type_VALUES_TO_NAMES.find(request.sort_key_filter_type)->second,
+            ::pegasus::utils::c_escape_string(request.sort_key_filter_pattern),
+            request.max_kv_count,
+            request.max_kv_size,
+            request.reverse ? "true" : "false",
+            count,
+            size,
+            iterate_count,
+            expire_count,
+            filter_count,
+            time_used);
+        _pfc_recent_abnormal_count->increment();
     }
 
     if (expire_count > 0) {
@@ -1070,7 +1053,7 @@ void pegasus_server_impl::on_ttl(const ::dsn::blob &key,
     uint32_t expire_ts = 0;
     uint32_t now_ts = ::pegasus::utils::epoch_now();
     if (status.ok()) {
-        expire_ts = pegasus_extract_expire_ts(_value_schema_version, value);
+        expire_ts = pegasus_extract_expire_ts(_pegasus_data_version, value);
         if (check_if_ts_expired(now_ts, expire_ts)) {
             _pfc_recent_expire_count->increment();
             if (_verbose_log) {
@@ -1457,7 +1440,7 @@ void pegasus_server_impl::on_clear_scanner(const int64_t &args) { _context_cache
     rocksdb::Options opts = _db_opts;
     opts.create_if_missing = true;
     opts.error_if_exists = false;
-    opts.default_value_schema_version = PEGASUS_VALUE_SCHEMA_MAX_VERSION;
+    opts.pegasus_data_version = PEGASUS_DATA_VERSION_MAX;
 
     //
     // here, we must distinguish three cases, such as:
@@ -1530,18 +1513,18 @@ void pegasus_server_impl::on_clear_scanner(const int64_t &args) { _context_cache
     auto status = rocksdb::DB::Open(opts, path, &_db);
     if (status.ok()) {
         _last_committed_decree = _db->GetLastFlushedDecree();
-        _value_schema_version = _db->GetValueSchemaVersion();
-        if (_value_schema_version > PEGASUS_VALUE_SCHEMA_MAX_VERSION) {
-            derror("%s: open app failed, unsupported value schema version %" PRIu32,
+        _pegasus_data_version = _db->GetPegasusDataVersion();
+        if (_pegasus_data_version > PEGASUS_DATA_VERSION_MAX) {
+            derror("%s: open app failed, unsupported data version %" PRIu32,
                    replica_name(),
-                   _value_schema_version);
+                   _pegasus_data_version);
             delete _db;
             _db = nullptr;
             return ::dsn::ERR_LOCAL_APP_FAILURE;
         }
 
         // only enable filter after correct value_schema_version set
-        _key_ttl_compaction_filter_factory->SetValueSchemaVersion(_value_schema_version);
+        _key_ttl_compaction_filter_factory->SetPegasusDataVersion(_pegasus_data_version);
         _key_ttl_compaction_filter_factory->EnableFilter();
 
         // update LastManualCompactFinishTime
@@ -1571,10 +1554,10 @@ void pegasus_server_impl::on_clear_scanner(const int64_t &args) { _context_cache
                     last_durable_decree());
         }
 
-        ddebug("%s: open app succeed, value_schema_version = %" PRIu32
+        ddebug("%s: open app succeed, pegasus_data_version = %" PRIu32
                ", last_durable_decree = %" PRId64 "",
                replica_name(),
-               _value_schema_version,
+               _pegasus_data_version,
                last_durable_decree());
 
         _is_open = true;
@@ -2170,7 +2153,7 @@ int pegasus_server_impl::append_key_value_for_scan(
     // extract value
     if (!no_value) {
         std::string value_buf(value.data(), value.size());
-        pegasus_extract_user_data(_value_schema_version, std::move(value_buf), kv.value);
+        pegasus_extract_user_data(_pegasus_data_version, std::move(value_buf), kv.value);
     }
 
     kvs.emplace_back(std::move(kv));
@@ -2213,7 +2196,7 @@ int pegasus_server_impl::append_key_value_for_multi_get(
     // extract value
     if (!no_value) {
         std::string value_buf(value.data(), value.size());
-        pegasus_extract_user_data(_value_schema_version, std::move(value_buf), kv.value);
+        pegasus_extract_user_data(_pegasus_data_version, std::move(value_buf), kv.value);
     }
 
     kvs.emplace_back(std::move(kv));
@@ -2320,6 +2303,7 @@ void pegasus_server_impl::update_app_envs(const std::map<std::string, std::strin
     update_usage_scenario(envs);
     update_default_ttl(envs);
     update_checkpoint_reserve(envs);
+    update_slow_query_threshold(envs);
     _manual_compact_svc.start_manual_compact_if_needed(envs);
 }
 
@@ -2329,6 +2313,7 @@ void pegasus_server_impl::update_app_envs_before_open_db(
     // we do not update usage scenario because it depends on opened db.
     update_default_ttl(envs);
     update_checkpoint_reserve(envs);
+    update_slow_query_threshold(envs);
     _manual_compact_svc.start_manual_compact_if_needed(envs);
 }
 
@@ -2357,6 +2342,147 @@ void pegasus_server_impl::update_usage_scenario(const std::map<std::string, std:
                            old_usage_scenario,
                            new_usage_scenario);
         }
+        _server_write->set_default_ttl(static_cast<uint32_t>(ttl));
+        _key_ttl_compaction_filter_factory->SetDefaultTTL(static_cast<uint32_t>(ttl));
+    }
+}
+
+void pegasus_server_impl::update_checkpoint_reserve(const std::map<std::string, std::string> &envs)
+{
+    int32_t count = _checkpoint_reserve_min_count_in_config;
+    int32_t time = _checkpoint_reserve_time_seconds_in_config;
+
+    auto find = envs.find(ROCKDB_CHECKPOINT_RESERVE_MIN_COUNT);
+    if (find != envs.end()) {
+        if (!dsn::buf2int32(find->second, count) || count <= 0) {
+            derror_replica("{}={} is invalid.", find->first, find->second);
+            return;
+        }
+    }
+    find = envs.find(ROCKDB_CHECKPOINT_RESERVE_TIME_SECONDS);
+    if (find != envs.end()) {
+        if (!dsn::buf2int32(find->second, time) || time < 0) {
+            derror_replica("{}={} is invalid.", find->first, find->second);
+            return;
+        }
+    }
+
+    if (count != _checkpoint_reserve_min_count) {
+        ddebug_replica("update app env[{}] from \"{}\" to \"{}\" succeed",
+                       ROCKDB_CHECKPOINT_RESERVE_MIN_COUNT,
+                       _checkpoint_reserve_min_count,
+                       count);
+        _checkpoint_reserve_min_count = count;
+    }
+    if (time != _checkpoint_reserve_time_seconds) {
+        ddebug_replica("update app env[{}] from \"{}\" to \"{}\" succeed",
+                       ROCKDB_CHECKPOINT_RESERVE_TIME_SECONDS,
+                       _checkpoint_reserve_time_seconds,
+                       time);
+        _checkpoint_reserve_time_seconds = time;
+    }
+}
+
+void pegasus_server_impl::update_slow_query_threshold(
+    const std::map<std::string, std::string> &envs)
+{
+    uint64_t threshold_ns = _slow_query_threshold_ns_in_config;
+    auto find = envs.find(ROCKSDB_ENV_SLOW_QUERY_THRESHOLD);
+    if (find != envs.end()) {
+        // get slow query from env(the unit of slow query from env is ms)
+        uint64_t threshold_ms;
+        if (!dsn::buf2uint64(find->second, threshold_ms) || threshold_ms <= 0) {
+            derror_replica("{}={} is invalid.", find->first, find->second);
+            return;
+        }
+        threshold_ns = threshold_ms * 1e6;
+    }
+
+    // check if they are changed
+    if (_slow_query_threshold_ns != threshold_ns) {
+        ddebug_replica("update app env[{}] from \"{}\" to \"{}\" succeed",
+                       ROCKSDB_ENV_SLOW_QUERY_THRESHOLD,
+                       _slow_query_threshold_ns,
+                       threshold_ns);
+        _slow_query_threshold_ns = threshold_ns;
+    }
+}
+
+bool pegasus_server_impl::parse_compression_types(
+    const std::string &config, std::vector<rocksdb::CompressionType> &compression_per_level)
+{
+    std::vector<rocksdb::CompressionType> tmp(_db_opts.num_levels, rocksdb::kNoCompression);
+    size_t i = config.find(COMPRESSION_HEADER);
+    if (i != std::string::npos) {
+        // New compression config style.
+        // 'per_level:[none|snappy|zstd|lz4],[none|snappy|zstd|lz4],...' for each level 0,1,...
+        // The last compression type will be used for levels not specified in the list.
+        std::vector<std::string> compression_types;
+        dsn::utils::split_args(
+            config.substr(COMPRESSION_HEADER.length()).c_str(), compression_types, ',');
+        rocksdb::CompressionType last_type = rocksdb::kNoCompression;
+        for (int i = 0; i < _db_opts.num_levels; ++i) {
+            if (i < compression_types.size()) {
+                if (!compression_str_to_type(compression_types[i], last_type)) {
+                    return false;
+                }
+            }
+            tmp[i] = last_type;
+        }
+    } else {
+        // Old compression config style.
+        // '[none|snappy|zstd|lz4]' for all level 2 and higher levels
+        rocksdb::CompressionType compression;
+        if (!compression_str_to_type(config, compression)) {
+            return false;
+        }
+        if (compression != rocksdb::kNoCompression) {
+            // only compress levels >= 2
+            // refer to ColumnFamilyOptions::OptimizeLevelStyleCompaction()
+            for (int i = 0; i < _db_opts.num_levels; ++i) {
+                if (i >= 2) {
+                    tmp[i] = compression;
+                }
+            }
+        }
+    }
+
+    compression_per_level = tmp;
+    return true;
+}
+
+bool pegasus_server_impl::compression_str_to_type(const std::string &compression_str,
+                                                  rocksdb::CompressionType &type)
+{
+    if (compression_str == "none") {
+        type = rocksdb::kNoCompression;
+    } else if (compression_str == "snappy") {
+        type = rocksdb::kSnappyCompression;
+    } else if (compression_str == "lz4") {
+        type = rocksdb::kLZ4Compression;
+    } else if (compression_str == "zstd") {
+        type = rocksdb::kZSTD;
+    } else {
+        derror_replica("Unsupported compression type: {}.", compression_str);
+        return false;
+    }
+    return true;
+}
+
+std::string pegasus_server_impl::compression_type_to_str(rocksdb::CompressionType type)
+{
+    switch (type) {
+    case rocksdb::kNoCompression:
+        return "none";
+    case rocksdb::kSnappyCompression:
+        return "snappy";
+    case rocksdb::kLZ4Compression:
+        return "lz4";
+    case rocksdb::kZSTD:
+        return "zstd";
+    default:
+        derror_replica("Unsupported compression type: {}.", type);
+        return "<unsupported>";
     }
 }
 

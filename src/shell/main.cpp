@@ -60,7 +60,7 @@ static command_executor commands[] = {
         "nodes",
         "get the node status for this cluster",
         "[-d|--detailed] [-j|--json] [-r|--resolve_ip] [-u|--resource_usage]"
-        "[-o|--output file_name] [-s|--status all|alive|unalive]",
+        "[-o|--output file_name] [-s|--status all|alive|unalive] [-q|--qps]",
         ls_nodes,
     },
     {
@@ -326,10 +326,28 @@ static command_executor commands[] = {
         "local_get", "get value from local db", "<db_path> <hash_key> <sort_key>", local_get,
     },
     {
+        "rdb_key_str2hex",
+        "transform the given hashkey and sortkey to rocksdb raw key in hex representation",
+        "<hash_key> <sort_key>",
+        rdb_key_str2hex,
+    },
+    {
+        "rdb_key_hex2str",
+        "transform the given rocksdb raw key in hex representation to hash key and sort key",
+        "<rdb_key_in_hex>",
+        rdb_key_hex2str,
+    },
+    {
+        "rdb_value_hex2str",
+        "parse the given rocksdb raw value in hex representation",
+        "<value_in_hex>",
+        rdb_value_hex2str,
+    },
+    {
         "sst_dump",
         "dump sstable dir or files",
         "[--command=check|scan|none|raw] <--file=data_dir_OR_sst_file> "
-        "[--from=user_key] [--to=user_key] [--read_num=num] [--show_properties]",
+        "[--from=user_key] [--to=user_key] [--read_num=num] [--show_properties] [--pegasus_data]",
         sst_dump,
     },
     {
