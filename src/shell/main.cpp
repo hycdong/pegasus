@@ -435,14 +435,26 @@ static command_executor commands[] = {
     {
         "start_bulk_load",
         "start app bulk load",
-        "[-a --app_name str] [-c --cluster_name str] [-p --file_provider_type str]",
+        "<-a --app_name str> <-c --cluster_name str> <-p --file_provider_type str>",
         start_bulk_load,
     },
     {
         "query_bulk_load_status",
         "query app bulk load status",
-        "[-a --app_name str] [-i --partition_index num] [-d --detailed]",
+        "<-a --app_name str> [-i --partition_index num] [-d --detailed]",
         query_bulk_load_status,
+    },
+    {
+        "pause_bulk_load", "pause app bulk load", "<-a --app_id num>", pause_bulk_load,
+    },
+    {
+        "restart_bulk_load", "restart app bulk load", "<-a --app_id num>", restart_bulk_load,
+    },
+    {
+        "cancel_bulk_load",
+        "cancel app bulk load",
+        "<-a --app_id num> [-f --forced]",
+        cancel_bulk_load,
     },
     {
         "exit", "exit shell", "", exit_shell,

@@ -220,6 +220,12 @@ bool start_bulk_load(command_executor *e, shell_context *sc, arguments args);
 
 bool query_bulk_load_status(command_executor *e, shell_context *sc, arguments args);
 
+bool pause_bulk_load(command_executor *e, shell_context *sc, arguments args);
+
+bool restart_bulk_load(command_executor *e, shell_context *sc, arguments args);
+
+bool cancel_bulk_load(command_executor *e, shell_context *sc, arguments args);
+
 // == debugger (see 'commands/debugger.cpp') == //Debugging tool
 
 bool sst_dump(command_executor *e, shell_context *sc, arguments args);
