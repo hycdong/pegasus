@@ -77,7 +77,8 @@ public:
 public:
     error_code start_bulk_load()
     {
-        return ddl_client->start_bulk_load(APP_NAME, CLUSTER, PROVIDER);
+        auto err_resp = ddl_client->start_bulk_load(APP_NAME, CLUSTER, PROVIDER);
+        return err_resp.get_value().err;
     }
 
     void wait_bulk_load_finish(int64_t seconds)

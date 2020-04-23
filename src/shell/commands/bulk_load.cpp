@@ -50,11 +50,17 @@ bool start_bulk_load(command_executor *e, shell_context *sc, arguments args)
         return false;
     }
 
-    ::dsn::error_code ret =
-        sc->ddl_client->start_bulk_load(app_name, cluster_name, file_provider_type);
-
-    if (ret != ::dsn::ERR_OK) {
-        fprintf(stderr, "start bulk load failed, err = %s\n", ret.to_string());
+    auto err_resp = sc->ddl_client->start_bulk_load(app_name, cluster_name, file_provider_type);
+    dsn::error_s err = err_resp.get_error();
+    std::string hint_msg;
+    if (err.is_ok()) {
+        err = dsn::error_s::make(err_resp.get_value().err);
+        hint_msg = err_resp.get_value().hint_msg;
+    }
+    if (!err.is_ok()) {
+        fmt::print(stderr, "start bulk load failed, error={} [hint:\"{}\"]\n", err, hint_msg);
+    } else {
+        fmt::print(stdout, "start bulk load succeed\n");
     }
 
     return true;
