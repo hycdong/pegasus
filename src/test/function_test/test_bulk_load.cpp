@@ -25,7 +25,8 @@ protected:
     {
         pegasus_root_dir = global_env::instance()._pegasus_root;
         working_root_dir = global_env::instance()._working_dir;
-        bulk_load_root = dsn::utils::filesystem::path_combine(pegasus_root_dir, LOCAL_ROOT);
+        bulk_load_provider_root =
+            dsn::utils::filesystem::path_combine(pegasus_root_dir, LOCAL_ROOT);
 
         // copy bulk_load files
         copy_bulk_load_files();
@@ -34,7 +35,8 @@ protected:
         system("./run.sh clear_onebox");
 
         system("cp src/server/config.min.ini config-server-test-bulk-load.ini");
-        std::string cmd = "sed -i \"/^\\s*bulk_load_root/c bulk_load_root = " + bulk_load_root;
+        std::string cmd = "sed -i \"/^\\s*bulk_load_provider_root/c bulk_load_provider_root = " +
+                          bulk_load_provider_root;
         cmd = cmd + std::string("\" config-server-test-bulk-load.ini");
         system(cmd.c_str());
 
@@ -53,7 +55,7 @@ protected:
     virtual void TearDown()
     {
         chdir(pegasus_root_dir.c_str());
-        std::string remove_cmd = "rm -rf " + bulk_load_root;
+        std::string remove_cmd = "rm -rf " + bulk_load_provider_root;
         system(remove_cmd.c_str());
         system("./run.sh clear_onebox");
         system("./run.sh start_onebox -w");
@@ -65,7 +67,7 @@ public:
     pegasus::pegasus_client *pg_client;
     std::string pegasus_root_dir;
     std::string working_root_dir;
-    std::string bulk_load_root;
+    std::string bulk_load_provider_root;
     enum operation
     {
         GET,
@@ -173,14 +175,15 @@ public:
     {
         chdir(pegasus_root_dir.c_str());
         std::string cmd = "cp -R src/test/function_test/bulk_load_files/mock_bulk_load_info/. " +
-                          bulk_load_root + "/" + CLUSTER + "/" + APP_NAME + "/";
+                          bulk_load_provider_root + "/" + CLUSTER + "/" + APP_NAME + "/";
         system(cmd.c_str());
     }
 
     void remove_file(bool is_bulk_load_info)
     {
         std::string file_name = is_bulk_load_info ? "/bulk_load_info" : "/0/bulk_load_metadata";
-        std::string cmd = "rm " + bulk_load_root + "/" + CLUSTER + "/" + APP_NAME + file_name;
+        std::string cmd =
+            "rm " + bulk_load_provider_root + "/" + CLUSTER + "/" + APP_NAME + file_name;
         system(cmd.c_str());
     }
 
