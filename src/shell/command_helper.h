@@ -9,7 +9,6 @@
 #include <iomanip>
 #include <fstream>
 #include <queue>
-#include <boost/lexical_cast.hpp>
 #include <boost/algorithm/string.hpp>
 #include <rocksdb/db.h>
 #include <rocksdb/sst_dump_tool.h>
@@ -21,6 +20,7 @@
 #include <dsn/dist/replication/mutation_log_tool.h>
 #include <dsn/perf_counter/perf_counter_utils.h>
 #include <dsn/utility/string_view.h>
+#include <dsn/utility/time_utils.h>
 
 #include <rrdb/rrdb.code.definition.h>
 #include <rrdb/rrdb_types.h>
@@ -512,6 +512,14 @@ inline bool parse_app_pegasus_perf_counter_name(const std::string &name,
 
 struct row_data
 {
+    double get_total_qps() const
+    {
+        return get_qps + multi_get_qps + scan_qps + put_qps + multi_put_qps + remove_qps +
+               multi_remove_qps + incr_qps + check_and_set_qps + check_and_mutate_qps;
+    }
+
+    double get_total_cu() const { return recent_read_cu + recent_write_cu; }
+
     std::string row_name;
     int32_t app_id = 0;
     int32_t partition_count = 0;
@@ -539,6 +547,14 @@ struct row_data
     double rdb_index_and_filter_blocks_mem_usage = 0;
     double rdb_memtable_mem_usage = 0;
     double rdb_estimate_num_keys = 0;
+    double backup_request_qps = 0;
+    double get_bytes = 0;
+    double multi_get_bytes = 0;
+    double scan_bytes = 0;
+    double put_bytes = 0;
+    double multi_put_bytes = 0;
+    double check_and_set_bytes = 0;
+    double check_and_mutate_bytes = 0;
 };
 
 inline bool
@@ -592,6 +608,22 @@ update_app_pegasus_perf_counter(row_data &row, const std::string &counter_name, 
         row.rdb_memtable_mem_usage += value;
     else if (counter_name == "rdb.estimate_num_keys")
         row.rdb_estimate_num_keys += value;
+    else if (counter_name == "backup_request_qps")
+        row.backup_request_qps += value;
+    else if (counter_name == "get_bytes")
+        row.get_bytes += value;
+    else if (counter_name == "multi_get_bytes")
+        row.multi_get_bytes += value;
+    else if (counter_name == "scan_bytes")
+        row.scan_bytes += value;
+    else if (counter_name == "put_bytes")
+        row.put_bytes += value;
+    else if (counter_name == "multi_put_bytes")
+        row.multi_put_bytes += value;
+    else if (counter_name == "check_and_set_bytes")
+        row.check_and_set_bytes += value;
+    else if (counter_name == "check_and_mutate_bytes")
+        row.check_and_mutate_bytes += value;
     else
         return false;
     return true;

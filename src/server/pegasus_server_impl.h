@@ -18,6 +18,7 @@
 #include "pegasus_scan_context.h"
 #include "pegasus_manual_compact_service.h"
 #include "pegasus_write_service.h"
+#include "range_read_limiter.h"
 
 namespace pegasus {
 namespace server {
@@ -152,6 +153,8 @@ public:
 
     virtual void query_app_envs(/*out*/ std::map<std::string, std::string> &envs) override;
 
+    virtual void set_partition_version(int32_t partition_version) override;
+
     virtual void set_ingestion_status(::dsn::replication::ingestion_status::type status) override;
 
     virtual ::dsn::replication::ingestion_status::type get_ingestion_status() const override
@@ -234,6 +237,8 @@ private:
 
     void update_slow_query_threshold(const std::map<std::string, std::string> &envs);
 
+    void update_rocksdb_iteration_threshold(const std::map<std::string, std::string> &envs);
+
     // return true if parse compression types 'config' success, otherwise return false.
     // 'compression_per_level' will not be changed if parse failed.
     bool parse_compression_types(const std::string &config,
@@ -313,16 +318,17 @@ private:
     uint64_t _slow_query_threshold_ns;
     uint64_t _slow_query_threshold_ns_in_config;
 
+    range_read_limiter_options _rng_rd_opts;
+
     std::shared_ptr<KeyWithTTLCompactionFilterFactory> _key_ttl_compaction_filter_factory;
     std::shared_ptr<rocksdb::Statistics> _statistics;
-    rocksdb::BlockBasedTableOptions _tbl_opts;
-    rocksdb::Options _db_opts;
-    rocksdb::WriteOptions _wt_opts;
-    rocksdb::ReadOptions _rd_opts;
+    rocksdb::DBOptions _db_opts;
+    rocksdb::ColumnFamilyOptions _data_cf_opts;
+    rocksdb::ReadOptions _data_cf_rd_opts;
     std::string _usage_scenario;
 
     rocksdb::DB *_db;
-    static std::shared_ptr<rocksdb::Cache> _block_cache;
+    static std::shared_ptr<rocksdb::Cache> _s_block_cache;
     volatile bool _is_open;
     uint32_t _pegasus_data_version;
     std::atomic<int64_t> _last_durable_decree;
@@ -345,6 +351,8 @@ private:
     static ::dsn::task_ptr _update_server_rdb_stat;
 
     pegasus_manual_compact_service _manual_compact_svc;
+
+    std::atomic<int32_t> _partition_version;
 
     ::dsn::replication::ingestion_status::type _ingestion_status;
 

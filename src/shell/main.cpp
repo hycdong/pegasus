@@ -432,6 +432,19 @@ static command_executor commands[] = {
         "[-s|--skip_prompt] [-o|--output file_name]",
         ddd_diagnose,
     },
+    {"add_dup", "add duplication", "<app_name> <remote_cluster_name> [-f|--freezed]", add_dup},
+    {"query_dup", "query duplication info", "<app_name> [-d|--detail]", query_dup},
+    {"remove_dup", "remove duplication", "<app_name> <dup_id>", remove_dup},
+    {"start_dup", "start duplication", "<app_name> <dup_id>", start_dup},
+    {"pause_dup", "pause duplication", "<app_name> <dup_id>", pause_dup},
+    {"disk_capacity",
+     "query disk capacity info",
+     "[-n|--node replica_server(ip:port)][-o|--out file_name][-j|-json][-d|--detail]",
+     query_disk_capacity},
+    {"disk_replica",
+     "query disk replica count info",
+     "[-n|--node replica_server(ip:port)][-a|-app app_name][-o|--out file_name][-j|--json]",
+     query_disk_replica},
     {
         "start_bulk_load",
         "start app bulk load",
@@ -666,20 +679,3 @@ int main(int argc, char **argv)
     run();
     return 0;
 }
-
-#include <dsn/git_commit.h>
-#include <dsn/version.h>
-#include <pegasus/git_commit.h>
-#include <pegasus/version.h>
-static char const rcsid[] =
-    "$Version: Pegasus Shell " PEGASUS_VERSION " (" PEGASUS_GIT_COMMIT ")"
-#if defined(DSN_BUILD_TYPE)
-    " " STR(DSN_BUILD_TYPE)
-#endif
-        ", built with rDSN " DSN_CORE_VERSION " (" DSN_GIT_COMMIT ")"
-        ", built by gcc " STR(__GNUC__) "." STR(__GNUC_MINOR__) "." STR(__GNUC_PATCHLEVEL__)
-#if defined(DSN_BUILD_HOSTNAME)
-            ", built on " STR(DSN_BUILD_HOSTNAME)
-#endif
-                ", built at " __DATE__ " " __TIME__ " $";
-const char *pegasus_shell_rcsid() { return rcsid; }

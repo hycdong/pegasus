@@ -3,6 +3,7 @@
 // can be found in the LICENSE file in the root directory of this source tree.
 
 #include "shell/commands.h"
+#include "idl_utils.h"
 
 static void
 print_current_scan_state(const std::vector<std::unique_ptr<scan_data_context>> &contexts,
@@ -737,8 +738,7 @@ bool check_and_set(command_executor *e, shell_context *sc, arguments args)
         fprintf(stderr, "ERROR: check_type not provided\n");
         return false;
     }
-    if (!check_operand_provided &&
-        check_type >= ::dsn::apps::cas_check_type::CT_VALUE_MATCH_ANYWHERE) {
+    if (!check_operand_provided && pegasus::cas_is_check_operand_needed(check_type)) {
         fprintf(stderr, "ERROR: check_operand not provided\n");
         return false;
     }
@@ -1013,6 +1013,8 @@ bool sortkey_count(command_executor *e, shell_context *sc, arguments args)
     int ret = sc->pg_client->sortkey_count(hash_key, count, sc->timeout_ms, &info);
     if (ret != pegasus::PERR_OK) {
         fprintf(stderr, "ERROR: %s\n", sc->pg_client->get_error_string(ret));
+    } else if (count == -1) {
+        fprintf(stderr, "ERROR: it takes too long to count sortkey\n");
     } else {
         fprintf(stderr, "%" PRId64 "\n", count);
     }
@@ -2430,7 +2432,7 @@ void escape_sds_argv(int argc, sds *argv)
 {
     for (int i = 0; i < argc; i++) {
         const size_t dest_len = sdslen(argv[i]) * 4 + 1; // Maximum possible expansion
-        sds new_arg = sdsnewlen("", dest_len);
+        sds new_arg = sdsnewlen(NULL, dest_len);
         pegasus::utils::c_escape_string(argv[i], sdslen(argv[i]), new_arg, dest_len);
         sdsfree(argv[i]);
         argv[i] = new_arg;

@@ -26,15 +26,16 @@ class pegasus_write_service::impl : public dsn::replication::replica_base
 {
 public:
     explicit impl(pegasus_server_impl *server)
-        : replica_base(*server),
+        : replica_base(server),
           _primary_address(server->_primary_address),
           _pegasus_data_version(server->_pegasus_data_version),
           _db(server->_db),
-          _wt_opts(server->_wt_opts),
-          _rd_opts(server->_rd_opts),
+          _rd_opts(server->_data_cf_rd_opts),
           _default_ttl(0),
           _pfc_recent_expire_count(server->_pfc_recent_expire_count)
     {
+        // disable write ahead logging as replication handles logging instead now
+        _wt_opts.disableWAL = true;
     }
 
     int empty_put(int64_t decree)
@@ -51,10 +52,11 @@ public:
         return err;
     }
 
-    int multi_put(int64_t decree,
+    int multi_put(const db_write_context &ctx,
                   const dsn::apps::multi_put_request &update,
                   dsn::apps::update_response &resp)
     {
+        int64_t decree = ctx.decree;
         resp.app_id = get_gpid().get_app_id();
         resp.partition_index = get_gpid().get_partition_index();
         resp.decree = decree;
@@ -70,10 +72,10 @@ public:
         }
 
         for (auto &kv : update.kvs) {
-            resp.error = db_write_batch_put(decree,
-                                            composite_raw_key(update.hash_key, kv.key),
-                                            kv.value,
-                                            static_cast<uint32_t>(update.expire_ts_seconds));
+            resp.error = db_write_batch_put_ctx(ctx,
+                                                composite_raw_key(update.hash_key, kv.key),
+                                                kv.value,
+                                                static_cast<uint32_t>(update.expire_ts_seconds));
             if (resp.error) {
                 clear_up_batch_states(decree, resp.error);
                 return resp.error;
@@ -484,12 +486,12 @@ public:
 
     /// For batch write.
 
-    int batch_put(int64_t decree,
+    int batch_put(const db_write_context &ctx,
                   const dsn::apps::update_request &update,
                   dsn::apps::update_response &resp)
     {
-        resp.error = db_write_batch_put(
-            decree, update.key, update.value, static_cast<uint32_t>(update.expire_ts_seconds));
+        resp.error = db_write_batch_put_ctx(
+            ctx, update.key, update.value, static_cast<uint32_t>(update.expire_ts_seconds));
         _update_responses.emplace_back(&resp);
         return resp.error;
     }
@@ -524,8 +526,20 @@ private:
                            dsn::string_view value,
                            uint32_t expire_sec)
     {
+        return db_write_batch_put_ctx(db_write_context::empty(decree), raw_key, value, expire_sec);
+    }
+
+    int db_write_batch_put_ctx(const db_write_context &ctx,
+                               dsn::string_view raw_key,
+                               dsn::string_view value,
+                               uint32_t expire_sec)
+    {
         FAIL_POINT_INJECT_F("db_write_batch_put",
                             [](dsn::string_view) -> int { return FAIL_DB_WRITE_BATCH_PUT; });
+
+        if (ctx.verfiy_timetag) {
+            // TBD(wutao1)
+        }
 
         rocksdb::Slice skey = utils::to_rocksdb_slice(raw_key);
         rocksdb::SliceParts skey_parts(&skey, 1);
@@ -538,7 +552,7 @@ private:
             derror_rocksdb("WriteBatchPut",
                            s.ToString(),
                            "decree: {}, hash_key: {}, sort_key: {}, expire_ts: {}",
-                           decree,
+                           ctx.decree,
                            utils::c_escape_string(hash_key),
                            utils::c_escape_string(sort_key),
                            expire_sec);
@@ -598,7 +612,7 @@ private:
         _batch.Clear();
     }
 
-    dsn::blob composite_raw_key(dsn::string_view hash_key, dsn::string_view sort_key)
+    static dsn::blob composite_raw_key(dsn::string_view hash_key, dsn::string_view sort_key)
     {
         dsn::blob raw_key;
         pegasus_generate_key(raw_key, hash_key, sort_key);
@@ -606,7 +620,7 @@ private:
     }
 
     // return true if the check type is supported
-    bool is_check_type_supported(::dsn::apps::cas_check_type::type check_type)
+    static bool is_check_type_supported(::dsn::apps::cas_check_type::type check_type)
     {
         return check_type >= ::dsn::apps::cas_check_type::CT_NO_CHECK &&
                check_type <= ::dsn::apps::cas_check_type::CT_VALUE_INT_GREATER;
@@ -778,7 +792,7 @@ private:
 
     rocksdb::WriteBatch _batch;
     rocksdb::DB *_db;
-    rocksdb::WriteOptions &_wt_opts;
+    rocksdb::WriteOptions _wt_opts;
     rocksdb::ReadOptions &_rd_opts;
     volatile uint32_t _default_ttl;
     ::dsn::perf_counter_wrapper &_pfc_recent_expire_count;

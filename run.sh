@@ -6,7 +6,7 @@ LOCAL_IP=`scripts/get_local_ip`
 export REPORT_DIR="$ROOT/test_report"
 export DSN_ROOT=$ROOT/DSN_ROOT
 export DSN_THIRDPARTY_ROOT=$ROOT/rdsn/thirdparty/output
-export LD_LIBRARY_PATH=$DSN_ROOT/lib:$DSN_THIRDPARTY_ROOT/lib:$BOOST_DIR/lib:$TOOLCHAIN_DIR/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=$DSN_ROOT/lib:$DSN_THIRDPARTY_ROOT/lib:$BOOST_DIR/lib:$LD_LIBRARY_PATH
 
 function usage()
 {
@@ -71,10 +71,16 @@ function usage_build()
     echo "   -v|--verbose          build in verbose mode, default no"
     echo "   --disable_gperf       build without gperftools, this flag is mainly used"
     echo "                         to enable valgrind memcheck, default no"
+    echo "   --sanitizer <type>    build with sanitizer to check potential problems,
+                                   type: address|leak|thread|undefined"
     echo "   --skip_thirdparty     whether to skip building thirdparties, default no"
 }
 function run_build()
 {
+    # Note(jiashuo1): No "memory" check mode, because MemorySanitizer is only available in Clang for Linux x86_64 targets
+    # # https://www.jetbrains.com/help/clion/google-sanitizers.html
+    SANITIZERS=("address" "leak" "thread" "undefined")
+
     C_COMPILER="gcc"
     CXX_COMPILER="g++"
     BUILD_TYPE="release"
@@ -88,6 +94,7 @@ function run_build()
     RUN_VERBOSE=NO
     DISABLE_GPERF=NO
     SKIP_THIRDPARTY=NO
+    SANITIZER=""
     TEST_MODULE=""
     while [[ $# > 0 ]]; do
         key="$1"
@@ -133,6 +140,16 @@ function run_build()
                 ;;
             --enable_gcov)
                 ENABLE_GCOV=YES
+                ;;
+            --sanitizer)
+                IS_SANITIZERS=`echo ${SANITIZERS[@]} | grep -w $2`
+                if [[ -z ${IS_SANITIZERS} ]]; then
+                    echo "ERROR: unknown sanitizer type \"$2\""
+                    usage_build
+                    exit 1
+                fi
+                SANITIZER="$2"
+                shift
                 ;;
             -v|--verbose)
                 RUN_VERBOSE=YES
@@ -199,6 +216,9 @@ function run_build()
     fi
     if [ "$SKIP_THIRDPARTY" == "YES" ]; then
         OPT="$OPT --skip_thirdparty"
+    fi
+    if [ ! -z $SANITIZER ]; then
+        OPT="$OPT --sanitizer $SANITIZER"
     fi
     ./run.sh build $OPT --notest
     if [ $? -ne 0 ]; then
@@ -283,7 +303,7 @@ function run_build()
     cd $ROOT/src
     C_COMPILER="$C_COMPILER" CXX_COMPILER="$CXX_COMPILER" BUILD_TYPE="$BUILD_TYPE" \
         CLEAR="$CLEAR" PART_CLEAR="$PART_CLEAR" JOB_NUM="$JOB_NUM" \
-        BOOST_DIR="$BOOST_DIR" WARNING_ALL="$WARNING_ALL" ENABLE_GCOV="$ENABLE_GCOV" \
+        BOOST_DIR="$BOOST_DIR" WARNING_ALL="$WARNING_ALL" ENABLE_GCOV="$ENABLE_GCOV" SANITIZER="$SANITIZER"\
         RUN_VERBOSE="$RUN_VERBOSE" TEST_MODULE="$TEST_MODULE" DISABLE_GPERF="$DISABLE_GPERF" ./build.sh
     if [ $? -ne 0 ]; then
         echo "ERROR: build pegasus failed"
@@ -314,7 +334,7 @@ function run_test()
 {
     local test_modules=""
     local clear_flags="1"
-    local on_traivs=""
+    local on_travis=""
     while [[ $# > 0 ]]; do
         key="$1"
         case $key in
@@ -350,8 +370,13 @@ function run_test()
     start_time=`date +%s`
 
     ./run.sh clear_onebox #clear the onebox before test
-    ./run.sh start_onebox -w
-
+    if ! ./run.sh start_onebox -w; then
+        echo "ERROR: unable to continue on testing because starting onebox failed"
+        exit 1
+    fi
+    
+    sed -i "s/@LOCAL_IP@/${LOCAL_IP}/g"  $ROOT/src/builder/server/test/config.ini
+    
     for module in `echo $test_modules`; do
         pushd $ROOT/src/builder/bin/$module
         REPORT_DIR=$REPORT_DIR ./run.sh $on_travis
@@ -599,9 +624,12 @@ function run_start_onebox()
         echo "ERROR: some onebox processes are running, start failed"
         exit 1
     fi
-    ln -s -f ${SERVER_PATH}/pegasus_server
+    ln -s -f "${SERVER_PATH}/pegasus_server" "${ROOT}"
 
-    run_start_zk
+    if ! run_start_zk; then
+        echo "ERROR: unable to setup onebox because zookeeper can not be started"
+        exit 1
+    fi
 
     if [ $USE_PRODUCT_CONFIG == "true" ]; then
         [ -z "${CONFIG_FILE}" ] && CONFIG_FILE=${ROOT}/src/server/config.ini
@@ -644,10 +672,11 @@ function run_start_onebox()
     for i in $(seq ${META_COUNT})
     do
         meta_port=$((34600+i))
+        prometheus_port=$((9091+i))
         mkdir -p meta$i;
         cd meta$i
         ln -s -f ${SERVER_PATH}/pegasus_server pegasus_server
-        sed "s/@META_PORT@/$meta_port/;s/@REPLICA_PORT@/34800/" ${ROOT}/config-server.ini >config.ini
+        sed "s/@META_PORT@/$meta_port/;s/@REPLICA_PORT@/34800/;s/@PROMETHEUS_PORT@/$prometheus_port/" ${ROOT}/config-server.ini >config.ini
         echo "cd `pwd` && $PWD/pegasus_server config.ini -app_list meta &>result &"
         $PWD/pegasus_server config.ini -app_list meta &>result &
         PID=$!
@@ -656,11 +685,12 @@ function run_start_onebox()
     done
     for j in $(seq ${REPLICA_COUNT})
     do
+        prometheus_port=$((9091+${META_COUNT}+j))
         replica_port=$((34800+j))
         mkdir -p replica$j
         cd replica$j
         ln -s -f ${SERVER_PATH}/pegasus_server pegasus_server
-        sed "s/@META_PORT@/34600/;s/@REPLICA_PORT@/$replica_port/" ${ROOT}/config-server.ini >config.ini
+        sed "s/@META_PORT@/34600/;s/@REPLICA_PORT@/$replica_port/;s/@PROMETHEUS_PORT@/$prometheus_port/" ${ROOT}/config-server.ini >config.ini
         echo "cd `pwd` && $PWD/pegasus_server config.ini -app_list replica &>result &"
         $PWD/pegasus_server config.ini -app_list replica &>result &
         PID=$!
@@ -672,7 +702,7 @@ function run_start_onebox()
         mkdir -p collector
         cd collector
         ln -s -f ${SERVER_PATH}/pegasus_server pegasus_server
-        sed "s/@META_PORT@/34600/;s/@REPLICA_PORT@/34800/" ${ROOT}/config-server.ini >config.ini
+        sed "s/@META_PORT@/34600/;s/@REPLICA_PORT@/34800/;s/@PROMETHEUS_PORT@/9091/" ${ROOT}/config-server.ini >config.ini
         echo "cd `pwd` && $PWD/pegasus_server config.ini -app_list collector &>result &"
         $PWD/pegasus_server config.ini -app_list collector &>result &
         PID=$!
