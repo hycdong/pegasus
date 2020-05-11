@@ -94,7 +94,7 @@ public:
             std::cout << "sleep " << sleep_time << "s to query bulk status" << std::endl;
             std::this_thread::sleep_for(std::chrono::seconds(sleep_time));
 
-            err = ddl_client->query_bulk_load(APP_NAME, -1, false);
+            err = ddl_client->query_bulk_load(APP_NAME).get_value().err;
         }
     }
 
