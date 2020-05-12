@@ -18,6 +18,7 @@
 #include "pegasus_scan_context.h"
 #include "pegasus_manual_compact_service.h"
 #include "pegasus_write_service.h"
+#include "range_read_limiter.h"
 
 namespace pegasus {
 namespace server {
@@ -144,9 +145,6 @@ public:
     storage_apply_checkpoint(chkpt_apply_mode mode,
                              const dsn::replication::learn_state &state) override;
 
-    // TODO(hyc): comments
-    virtual void set_partition_version(uint32_t partition_version) override;
-
     virtual int64_t last_durable_decree() const override { return _last_durable_decree.load(); }
 
     virtual int64_t last_flushed_decree() const override { return _db->GetLastFlushedDecree(); }
@@ -155,9 +153,12 @@ public:
 
     virtual void query_app_envs(/*out*/ std::map<std::string, std::string> &envs) override;
 
+    virtual void set_partition_version(int32_t partition_version) override;
+
 private:
     friend class manual_compact_service_test;
     friend class pegasus_compression_options_test;
+    friend class pegasus_server_impl_test;
 
     friend class pegasus_manual_compact_service;
     friend class pegasus_write_service;
@@ -229,6 +230,10 @@ private:
 
     void update_checkpoint_reserve(const std::map<std::string, std::string> &envs);
 
+    void update_slow_query_threshold(const std::map<std::string, std::string> &envs);
+
+    void update_rocksdb_iteration_threshold(const std::map<std::string, std::string> &envs);
+
     // return true if parse compression types 'config' success, otherwise return false.
     // 'compression_per_level' will not be changed if parse failed.
     bool parse_compression_types(const std::string &config,
@@ -265,7 +270,35 @@ private:
     bool check_if_record_expired(uint32_t epoch_now, rocksdb::Slice raw_value)
     {
         return pegasus::check_if_record_expired(
-            _value_schema_version, epoch_now, utils::to_string_view(raw_value));
+            _pegasus_data_version, epoch_now, utils::to_string_view(raw_value));
+    }
+
+    bool is_multi_get_abnormal(uint64_t time_used, uint64_t size, uint64_t iterate_count)
+    {
+        if (_abnormal_multi_get_size_threshold && size >= _abnormal_multi_get_size_threshold) {
+            return true;
+        }
+        if (_abnormal_multi_get_iterate_count_threshold &&
+            iterate_count >= _abnormal_multi_get_iterate_count_threshold) {
+            return true;
+        }
+        if (time_used >= _slow_query_threshold_ns) {
+            return true;
+        }
+
+        return false;
+    }
+
+    bool is_get_abnormal(uint64_t time_used, uint64_t value_size)
+    {
+        if (_abnormal_get_size_threshold && value_size >= _abnormal_get_size_threshold) {
+            return true;
+        }
+        if (time_used >= _slow_query_threshold_ns) {
+            return true;
+        }
+
+        return false;
     }
 
     // return rocksdb::Status::OK() if partition should serve key
@@ -280,24 +313,26 @@ private:
     dsn::gpid _gpid;
     std::string _primary_address;
     bool _verbose_log;
-    uint64_t _abnormal_get_time_threshold_ns;
     uint64_t _abnormal_get_size_threshold;
-    uint64_t _abnormal_multi_get_time_threshold_ns;
     uint64_t _abnormal_multi_get_size_threshold;
     uint64_t _abnormal_multi_get_iterate_count_threshold;
+    // slow query time threshold. exceed this threshold will be logged.
+    uint64_t _slow_query_threshold_ns;
+    uint64_t _slow_query_threshold_ns_in_config;
+
+    range_read_limiter_options _rng_rd_opts;
 
     std::shared_ptr<KeyWithTTLCompactionFilterFactory> _key_ttl_compaction_filter_factory;
     std::shared_ptr<rocksdb::Statistics> _statistics;
-    rocksdb::BlockBasedTableOptions _tbl_opts;
-    rocksdb::Options _db_opts;
-    rocksdb::WriteOptions _wt_opts;
-    rocksdb::ReadOptions _rd_opts;
+    rocksdb::DBOptions _db_opts;
+    rocksdb::ColumnFamilyOptions _data_cf_opts;
+    rocksdb::ReadOptions _data_cf_rd_opts;
     std::string _usage_scenario;
 
     rocksdb::DB *_db;
-    static std::shared_ptr<rocksdb::Cache> _block_cache;
+    static std::shared_ptr<rocksdb::Cache> _s_block_cache;
     volatile bool _is_open;
-    uint32_t _value_schema_version;
+    uint32_t _pegasus_data_version;
     std::atomic<int64_t> _last_durable_decree;
 
     std::unique_ptr<capacity_unit_calculator> _cu_calculator;
@@ -319,7 +354,7 @@ private:
 
     pegasus_manual_compact_service _manual_compact_svc;
 
-    std::atomic<uint32_t> _partition_version;
+    std::atomic<int32_t> _partition_version;
 
     dsn::task_tracker _tracker;
 
@@ -346,6 +381,7 @@ private:
     ::dsn::perf_counter_wrapper _pfc_rdb_block_cache_total_count;
     ::dsn::perf_counter_wrapper _pfc_rdb_index_and_filter_blocks_mem_usage;
     ::dsn::perf_counter_wrapper _pfc_rdb_memtable_mem_usage;
+    ::dsn::perf_counter_wrapper _pfc_rdb_estimate_num_keys;
 };
 
 } // namespace server

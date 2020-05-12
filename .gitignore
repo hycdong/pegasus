@@ -91,3 +91,7 @@ LOG
 .history/
 
 .shell-history
+PACKAGE
+scripts/py_utils/*.pyc
+cmake-build-debug
+packages

@@ -201,6 +201,7 @@ TEST_F(split, split_scan)
                 // hash_scan during this procedure
                 pegasus::pegasus_client::pegasus_scanner *scanner = nullptr;
                 pegasus::pegasus_client::scan_options options;
+                options.batch_size = 1000;
                 int ret = pg_client->get_scanner(hash_key, "", "", options, scanner);
                 ASSERT_EQ(ret, 0);
 

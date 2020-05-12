@@ -6,11 +6,11 @@ set(MY_PROJ_SRC "../pegasus_server_impl.cpp"
                 "../pegasus_write_service.cpp"
                 "../pegasus_server_write.cpp"
                 "../capacity_unit_calculator.cpp"
+                "../pegasus_mutation_duplicator.cpp"
+                "../table_hotspot_policy.cpp"
 )
 
 set(MY_SRC_SEARCH_MODE "GLOB")
-
-set(MY_PROJ_LIB_PATH "../../../rocksdb/build")
 
 set(MY_PROJ_LIBS
         dsn_replica_server
@@ -23,6 +23,7 @@ set(MY_PROJ_LIBS
         dsn.failure_detector.multimaster
         dsn.replication.zookeeper_provider
         pegasus_reporter
+        RocksDB::rocksdb
         pegasus_client_static
         zookeeper_mt
         event
@@ -31,17 +32,13 @@ set(MY_PROJ_LIBS
         PocoFoundation
         PocoNetSSL
         PocoJSON
-        crypto
-        fmt
-        ${ROCKSDB_LINK_LIBRARIES}
-        pegasus.base
+        pegasus_base
         gtest
-        z rt aio pthread
         )
 add_definitions(-DPEGASUS_UNIT_TEST)
 add_definitions(-DENABLE_FAIL)
 
-set(MY_BOOST_PACKAGES system filesystem regex)
+set(MY_BOOST_LIBS Boost::system Boost::filesystem Boost::regex)
 
 set(MY_BINPLACES config.ini run.sh)
 

@@ -42,10 +42,10 @@ else
 fi
 version=`grep "VERSION" src/include/pegasus/version.h | cut -d "\"" -f 2`
 commit_id=`grep "GIT_COMMIT" src/include/pegasus/git_commit.h | cut -d "\"" -f 2`
-platform=`lsb_release -a 2>/dev/null | grep "Distributor ID" | awk '{print $3}' | tr '[A-Z]' '[a-z]'`
-echo "Packaging pegasus tools $version ($commit_id) $platform $build_type ..."
+glibc_ver=`ldd --version | grep ldd | grep -Eo "[0-9]+.[0-9]+$"`
+echo "Packaging pegasus tools $version ($commit_id) glibc-$glibc_ver $build_type ..."
 
-pack_version=tools-$version-${commit_id:0:7}-${platform}-${build_type}
+pack_version=tools-$version-${commit_id:0:7}-glibc${glibc_ver}-${build_type}
 pack=pegasus-$pack_version
 
 if [ -f ${pack}.tar.gz ]
@@ -103,6 +103,7 @@ copy_file ./rdsn/thirdparty/output/lib/libPoco*.so.48 ${pack}/DSN_ROOT/lib/
 copy_file ./rdsn/thirdparty/output/lib/libtcmalloc_and_profiler.so.4 ${pack}/DSN_ROOT/lib/
 copy_file `get_boost_lib $custom_boost_lib system` ${pack}/DSN_ROOT/lib/
 copy_file `get_boost_lib $custom_boost_lib filesystem` ${pack}/DSN_ROOT/lib/
+copy_file `get_boost_lib $custom_boost_lib regex` ${pack}/DSN_ROOT/lib/
 copy_file `get_stdcpp_lib $custom_gcc` ${pack}/DSN_ROOT/lib/
 copy_file `get_system_lib shell snappy` ${pack}/DSN_ROOT/lib/`get_system_libname shell snappy`
 copy_file `get_system_lib shell crypto` ${pack}/DSN_ROOT/lib/`get_system_libname shell crypto`

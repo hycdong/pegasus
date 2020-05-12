@@ -19,12 +19,12 @@ namespace server {
 class KeyWithTTLCompactionFilter : public rocksdb::CompactionFilter
 {
 public:
-    KeyWithTTLCompactionFilter(uint32_t value_schema_version,
+    KeyWithTTLCompactionFilter(uint32_t pegasus_data_version,
                                uint32_t default_ttl,
                                bool enabled,
                                uint32_t partition_id,
                                uint32_t partition_version)
-        : _value_schema_version(value_schema_version),
+        : _pegasus_data_version(pegasus_data_version),
           _default_ttl(default_ttl),
           _enabled(enabled),
           _partition_id(partition_id),
@@ -44,12 +44,12 @@ public:
         }
 
         uint32_t expire_ts =
-            pegasus_extract_expire_ts(_value_schema_version, utils::to_string_view(existing_value));
+            pegasus_extract_expire_ts(_pegasus_data_version, utils::to_string_view(existing_value));
         if (_default_ttl != 0 && expire_ts == 0) {
             // should update ttl
             *new_value = existing_value.ToString();
             pegasus_update_expire_ts(
-                _value_schema_version, *new_value, utils::epoch_now() + _default_ttl);
+                _pegasus_data_version, *new_value, utils::epoch_now() + _default_ttl);
             *value_changed = true;
             return false;
         }
@@ -81,7 +81,7 @@ public:
     const char *Name() const override { return "KeyWithTTLCompactionFilter"; }
 
 private:
-    uint32_t _value_schema_version;
+    uint32_t _pegasus_data_version;
     uint32_t _default_ttl;
     bool _enabled; // only process filtering when _enabled == true
     mutable pegasus_value_generator _gen;
@@ -93,14 +93,14 @@ private:
 class KeyWithTTLCompactionFilterFactory : public rocksdb::CompactionFilterFactory
 {
 public:
-    KeyWithTTLCompactionFilterFactory() : _value_schema_version(0), _default_ttl(0), _enabled(false)
+    KeyWithTTLCompactionFilterFactory() : _pegasus_data_version(0), _default_ttl(0), _enabled(false)
     {
     }
     std::unique_ptr<rocksdb::CompactionFilter>
     CreateCompactionFilter(const rocksdb::CompactionFilter::Context & /*context*/) override
     {
         return std::unique_ptr<KeyWithTTLCompactionFilter>(
-            new KeyWithTTLCompactionFilter(_value_schema_version.load(),
+            new KeyWithTTLCompactionFilter(_pegasus_data_version.load(),
                                            _default_ttl.load(),
                                            _enabled.load(),
                                            _partition_id.load(),
@@ -108,9 +108,9 @@ public:
     }
     const char *Name() const override { return "KeyWithTTLCompactionFilterFactory"; }
 
-    void SetValueSchemaVersion(uint32_t version)
+    void SetPegasusDataVersion(uint32_t version)
     {
-        _value_schema_version.store(version, std::memory_order_release);
+        _pegasus_data_version.store(version, std::memory_order_release);
     }
     void EnableFilter() { _enabled.store(true, std::memory_order_release); }
     void SetDefaultTTL(uint32_t ttl) { _default_ttl.store(ttl, std::memory_order_release); }
@@ -121,7 +121,7 @@ public:
     }
 
 private:
-    std::atomic<uint32_t> _value_schema_version;
+    std::atomic<uint32_t> _pegasus_data_version;
     std::atomic<uint32_t> _default_ttl;
     std::atomic_bool _enabled; // only process filtering when _enabled == true
 

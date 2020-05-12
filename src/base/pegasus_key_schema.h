@@ -81,7 +81,7 @@ void pegasus_generate_next_blob(::dsn::blob &next, const T &hash_key, const T &s
     next = buf.range(0, p - (unsigned char *)(buf.data()) + 1);
 }
 
-// restore hash_key and sort_key from rocksdb value.
+// restore hash_key and sort_key from rocksdb key.
 // no data copied.
 inline void
 pegasus_restore_key(const ::dsn::blob &key, ::dsn::blob &hash_key, ::dsn::blob &sort_key)
@@ -106,7 +106,7 @@ pegasus_restore_key(const ::dsn::blob &key, ::dsn::blob &hash_key, ::dsn::blob &
     }
 }
 
-// restore hash_key and sort_key from rocksdb value.
+// restore hash_key and sort_key from rocksdb key.
 // data is copied into output 'hash_key' and 'sort_key'.
 inline void
 pegasus_restore_key(const ::dsn::blob &key, std::string &hash_key, std::string &sort_key)
@@ -138,20 +138,26 @@ pegasus_restore_key(const ::dsn::blob &key, std::string &hash_key, std::string &
 template <typename T>
 inline uint64_t pegasus_key_hash(const T &key)
 {
-    dassert(key.length() >= 2, "key length must be no less than 2");
+    dassert(key.size() >= 2, "key length must be no less than 2");
 
     // hash_key_len is in big endian
     uint16_t hash_key_len = be16toh(*(int16_t *)(key.data()));
 
     if (hash_key_len > 0) {
         // hash_key_len > 0, compute hash from hash_key
-        dassert(key.length() >= 2 + hash_key_len,
+        dassert(key.size() >= 2 + hash_key_len,
                 "key length must be no less than (2 + hash_key_len)");
         return dsn::utils::crc64_calc(key.data() + 2, hash_key_len, 0);
     } else {
         // hash_key_len == 0, compute hash from sort_key
-        return dsn::utils::crc64_calc(key.data() + 2, key.length() - 2, 0);
+        return dsn::utils::crc64_calc(key.data() + 2, key.size() - 2, 0);
     }
+}
+
+/// Calculate hash value from hash key.
+inline uint64_t pegasus_hash_key_hash(const ::dsn::blob &hash_key)
+{
+    return dsn::utils::crc64_calc(hash_key.data(), hash_key.length(), 0);
 }
 
 } // namespace pegasus
