@@ -281,12 +281,20 @@ bool pause_bulk_load(command_executor *e, shell_context *sc, arguments args)
         return false;
     }
 
-    ::dsn::error_code ret = sc->ddl_client->control_bulk_load(
-        app_id, ::dsn::replication::bulk_load_control_type::BLC_PAUSE);
-
-    if (ret != ::dsn::ERR_OK) {
-        fprintf(stderr, "pause bulk load failed, err = %s\n", ret.to_string());
+    auto err_resp = sc->ddl_client->control_bulk_load(
+        app_id, dsn::replication::bulk_load_control_type::BLC_PAUSE);
+    dsn::error_s err = err_resp.get_error();
+    std::string hint_msg;
+    if (err.is_ok()) {
+        err = dsn::error_s::make(err_resp.get_value().err);
+        hint_msg = err_resp.get_value().hint_msg;
     }
+    if (!err.is_ok()) {
+        fmt::print(stderr, "pause bulk load failed, error={} [hint:\"{}\"]\n", err, hint_msg);
+    } else {
+        fmt::print(stdout, "pause bulk load succeed\n");
+    }
+
     return true;
 }
 
@@ -316,12 +324,20 @@ bool restart_bulk_load(command_executor *e, shell_context *sc, arguments args)
         return false;
     }
 
-    ::dsn::error_code ret = sc->ddl_client->control_bulk_load(
-        app_id, ::dsn::replication::bulk_load_control_type::BLC_RESTART);
-
-    if (ret != ::dsn::ERR_OK) {
-        fprintf(stderr, "restart bulk load failed, err = %s\n", ret.to_string());
+    auto err_resp = sc->ddl_client->control_bulk_load(
+        app_id, dsn::replication::bulk_load_control_type::BLC_RESTART);
+    dsn::error_s err = err_resp.get_error();
+    std::string hint_msg;
+    if (err.is_ok()) {
+        err = dsn::error_s::make(err_resp.get_value().err);
+        hint_msg = err_resp.get_value().hint_msg;
     }
+    if (!err.is_ok()) {
+        fmt::print(stderr, "restart bulk load failed, error={} [hint:\"{}\"]\n", err, hint_msg);
+    } else {
+        fmt::print(stdout, "restart bulk load succeed\n");
+    }
+
     return true;
 }
 
@@ -356,12 +372,24 @@ bool cancel_bulk_load(command_executor *e, shell_context *sc, arguments args)
         return false;
     }
 
-    auto type = forced ? ::dsn::replication::bulk_load_control_type::BLC_FORCE_CANCEL
-                       : ::dsn::replication::bulk_load_control_type::BLC_CANCEL;
-    ::dsn::error_code ret = sc->ddl_client->control_bulk_load(app_id, type);
-
-    if (ret != ::dsn::ERR_OK) {
-        fprintf(stderr, "cancel bulk load failed, err = %s\n", ret.to_string());
+    auto type = forced ? dsn::replication::bulk_load_control_type::BLC_FORCE_CANCEL
+                       : dsn::replication::bulk_load_control_type::BLC_CANCEL;
+    auto err_resp = sc->ddl_client->control_bulk_load(app_id, type);
+    dsn::error_s err = err_resp.get_error();
+    std::string hint_msg;
+    if (err.is_ok()) {
+        err = dsn::error_s::make(err_resp.get_value().err);
+        hint_msg = err_resp.get_value().hint_msg;
     }
+    if (!err.is_ok()) {
+        fmt::print(stderr, "cancel bulk load failed, error={} [hint:\"{}\"]\n", err, hint_msg);
+        if (err.code() == dsn::ERR_INVALID_STATE &&
+            type == dsn::replication::bulk_load_control_type::BLC_CANCEL) {
+            fmt::print(stderr, "you can force cancel bulk load by using \"-f\"\n");
+        }
+    } else {
+        fmt::print(stdout, "cancel bulk load succeed\n");
+    }
+
     return true;
 }
