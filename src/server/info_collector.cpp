@@ -77,12 +77,10 @@ info_collector::info_collector()
                                               "storage_size_fetch_interval_seconds",
                                               3600, // default value 1h
                                               "storage size fetch interval seconds");
-
     _hotspot_detect_algorithm = dsn_config_get_value_string("pegasus.collector",
                                                             "hotspot_detect_algorithm",
                                                             "hotspot_algo_qps_variance",
                                                             "hotspot_detect_algorithm");
-
     // _storage_size_retry_wait_seconds is in range of [1, 60]
     _storage_size_retry_wait_seconds =
         std::min(60u, std::max(1u, _storage_size_fetch_interval_seconds / 10));

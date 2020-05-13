@@ -779,7 +779,7 @@ get_app_stat(shell_context *sc, const std::string &app_name, std::vector<row_dat
     }
 
     ::dsn::command command;
-    command.cmd = "perf-counters-by-substr";
+    command.cmd = "perf-counters";
     char tmp[256];
     if (app_name.empty()) {
         sprintf(tmp, ".*@.*");

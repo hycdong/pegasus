@@ -63,7 +63,6 @@ bool ls_nodes(command_executor *e, shell_context *sc, arguments args)
     bool show_qps = false;
     bool show_latency = false;
     bool json = false;
-
     optind = 0;
     while (true) {
         int option_index = 0;

@@ -210,12 +210,12 @@ int pegasus_write_service::batch_put(const db_write_context &ctx,
 
     _batch_qps_perfcounters.push_back(_pfc_put_qps.get());
     _batch_latency_perfcounters.push_back(_pfc_put_latency.get());
-
     int err = _impl->batch_put(ctx, update, resp);
 
     if (_server->is_primary()) {
         _cu_calculator->add_put_cu(resp.error, update.key, update.value);
     }
+
     return err;
 }
 

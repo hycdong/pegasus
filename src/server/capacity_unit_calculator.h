@@ -26,7 +26,6 @@ public:
 
     void add_put_cu(int32_t status, const dsn::blob &key, const dsn::blob &value);
     void add_remove_cu(int32_t status, const dsn::blob &key);
-
     void add_multi_put_cu(int32_t status,
                           const dsn::blob &hash_key,
                           const std::vector<::dsn::apps::key_value> &kvs);
