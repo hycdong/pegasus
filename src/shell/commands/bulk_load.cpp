@@ -179,7 +179,7 @@ bool query_bulk_load_status(command_executor *e, shell_context *sc, arguments ar
                 tp_all.append_data(partitions_progress[i]);
             }
             if (print_cleanup_flag) {
-                bool is_cleanup = true;
+                bool is_cleanup = (states.size() == resp.max_replica_count);
                 for (const auto &kv : states) {
                     is_cleanup = is_cleanup && kv.second.is_cleanuped;
                 }
