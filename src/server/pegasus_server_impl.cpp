@@ -2896,7 +2896,9 @@ void pegasus_server_impl::set_partition_version(int32_t partition_version)
 
 void pegasus_server_impl::set_ingestion_status(dsn::replication::ingestion_status::type status)
 {
-    ddebug_replica("ingestion status from {} to {}", _ingestion_status, status);
+    ddebug_replica("ingestion status from {} to {}",
+                   dsn::enum_to_string(_ingestion_status),
+                   dsn::enum_to_string(status));
     _ingestion_status = status;
 }
 

@@ -336,7 +336,6 @@ int pegasus_write_service::ingestion_files(int64_t decree,
                                            const dsn::replication::ingestion_request &req,
                                            dsn::replication::ingestion_response &resp)
 {
-    // TODO(heyuchen): add perf-counter
     // TODO(heyuchen): consider cu
 
     resp.err = dsn::ERR_OK;
@@ -347,18 +346,17 @@ int pegasus_write_service::ingestion_files(int64_t decree,
         return resp.rocksdb_error;
     }
 
-    _server->set_ingestion_status(::dsn::replication::ingestion_status::IS_RUNNING);
-
+    // ingest files asynchronously
+    _server->set_ingestion_status(dsn::replication::ingestion_status::IS_RUNNING);
     dsn::tasking::enqueue(LPC_INGESTION, &_server->_tracker, [this, decree, req]() {
         dsn::error_code err =
             _impl->ingestion_files(decree, _server->bulk_load_dir(), req.metadata);
         if (err == dsn::ERR_OK) {
-            _server->set_ingestion_status(::dsn::replication::ingestion_status::IS_SUCCEED);
+            _server->set_ingestion_status(dsn::replication::ingestion_status::IS_SUCCEED);
         } else {
-            _server->set_ingestion_status(::dsn::replication::ingestion_status::IS_FAILED);
+            _server->set_ingestion_status(dsn::replication::ingestion_status::IS_FAILED);
         }
     });
-
     return rocksdb::Status::kOk;
 }
 

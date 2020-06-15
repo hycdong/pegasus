@@ -155,9 +155,10 @@ public:
 
     virtual void set_partition_version(int32_t partition_version) override;
 
-    virtual void set_ingestion_status(::dsn::replication::ingestion_status::type status) override;
+    // Not thread-safe
+    void set_ingestion_status(dsn::replication::ingestion_status::type status) override;
 
-    virtual ::dsn::replication::ingestion_status::type get_ingestion_status() const override
+    dsn::replication::ingestion_status::type get_ingestion_status() override
     {
         return _ingestion_status;
     }
@@ -354,7 +355,8 @@ private:
 
     std::atomic<int32_t> _partition_version;
 
-    ::dsn::replication::ingestion_status::type _ingestion_status;
+    dsn::replication::ingestion_status::type _ingestion_status{
+        dsn::replication::ingestion_status::IS_INVALID};
 
     dsn::task_tracker _tracker;
 

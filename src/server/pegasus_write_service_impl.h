@@ -11,8 +11,8 @@
 #include "base/pegasus_key_schema.h"
 
 #include <dsn/utility/fail_point.h>
-#include <dsn/utility/string_conv.h>
 #include <dsn/utility/filesystem.h>
+#include <dsn/utility/string_conv.h>
 
 namespace pegasus {
 namespace server {
@@ -21,6 +21,22 @@ namespace server {
 static constexpr int FAIL_DB_WRITE_BATCH_PUT = -101;
 static constexpr int FAIL_DB_WRITE_BATCH_DELETE = -102;
 static constexpr int FAIL_DB_WRITE = -103;
+
+inline dsn::error_code get_external_files_path(const std::string &bulk_load_dir,
+                                               const dsn::replication::bulk_load_metadata &metadata,
+                                               /*out*/ std::vector<std::string> &files_path)
+{
+    for (const auto &f_meta : metadata.files) {
+        const std::string &file_name =
+            dsn::utils::filesystem::path_combine(bulk_load_dir, f_meta.name);
+        if (dsn::utils::filesystem::verify_file(file_name, f_meta.md5, f_meta.size)) {
+            files_path.emplace_back(file_name);
+        } else {
+            break;
+        }
+    }
+    return files_path.size() == metadata.files.size() ? dsn::ERR_OK : dsn::ERR_WRONG_CHECKSUM;
+}
 
 class pegasus_write_service::impl : public dsn::replication::replica_base
 {
@@ -461,13 +477,16 @@ public:
         return 0;
     }
 
+    // \return ERR_WRONG_CHECKSUM: verify files failed
+    // \return ERR_INGESTION_FAILED: rocksdb ingestion failed
+    // \return ERR_OK: rocksdb ingestion succeed
     dsn::error_code ingestion_files(const int64_t decree,
-                                    const std::string bulk_load_dir,
-                                    const dsn::replication::bulk_load_metadata metadata)
+                                    const std::string &bulk_load_dir,
+                                    const dsn::replication::bulk_load_metadata &metadata)
     {
-        // verify external files
+        // verify external files before ingestion
         std::vector<std::string> sst_file_list;
-        dsn::error_code err = get_external_files_path(bulk_load_dir, sst_file_list, metadata);
+        dsn::error_code err = get_external_files_path(bulk_load_dir, metadata, sst_file_list);
         if (err != dsn::ERR_OK) {
             return err;
         }
@@ -476,10 +495,10 @@ public:
         rocksdb::IngestExternalFileOptions ifo;
         rocksdb::Status s = _db->IngestExternalFile(sst_file_list, ifo);
         if (!s.ok()) {
-            derror_rocksdb("IngestExternalFile", s.ToString(), "decree={}", decree);
+            derror_rocksdb("IngestExternalFile", s.ToString(), "decree = {}", decree);
             return dsn::ERR_INGESTION_FAILED;
         } else {
-            ddebug_rocksdb("IngestExternalFile", "Ingest files succeed, decree={}", decree);
+            ddebug_rocksdb("IngestExternalFile", "Ingest files succeed, decree = {}", decree);
             return dsn::ERR_OK;
         }
     }
@@ -734,53 +753,6 @@ private:
         }
 
         return expire_ts;
-    }
-
-    dsn::error_code get_external_files_path(const std::string bulk_load_dir,
-                                            std::vector<std::string> &files_path,
-                                            const dsn::replication::bulk_load_metadata &metadata)
-    {
-        for (auto iter = metadata.files.begin(); iter != metadata.files.end(); ++iter) {
-            std::string file_path;
-            if (!verify_external_file(bulk_load_dir, *iter, file_path)) {
-                break;
-            } else {
-                files_path.emplace_back(file_path);
-            }
-        }
-        return files_path.size() == metadata.files.size() ? dsn::ERR_OK : dsn::ERR_WRONG_CHECKSUM;
-    }
-
-    bool verify_external_file(const std::string bulk_load_dir,
-                              const dsn::replication::file_meta &f_meta,
-                              std::string &file_path)
-    {
-        file_path = dsn::utils::filesystem::path_combine(bulk_load_dir, f_meta.name);
-        if (!dsn::utils::filesystem::file_exists(file_path)) {
-            derror_f("file({}) is not existed", file_path);
-            return false;
-        }
-        int64_t file_sz = 0;
-        std::string md5;
-        if (!::dsn::utils::filesystem::file_size(file_path, file_sz)) {
-            derror_f("get file({}) size failed", file_path);
-            return false;
-        }
-        if (::dsn::utils::filesystem::md5sum(file_path, md5) != dsn::ERR_OK) {
-            derror_f("get file({}) md5 failed", file_path);
-            return false;
-        }
-        if (file_sz != f_meta.size || md5 != f_meta.md5) {
-            derror_f("file({}) is damaged, local file md5={}, request file md5={}, local file "
-                     "size={}, request file size={}",
-                     file_path,
-                     md5,
-                     f_meta.md5,
-                     file_sz,
-                     f_meta.size);
-            return false;
-        }
-        return true;
     }
 
 private:
