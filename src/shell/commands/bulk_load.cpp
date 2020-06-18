@@ -168,7 +168,7 @@ bool query_bulk_load_status(command_executor *e, shell_context *sc, arguments ar
             tp_all.add_column("download_progress(%)");
         }
         if (print_cleanup_flag) {
-            tp_all.add_column("context_cleanuped");
+            tp_all.add_column("is_cleaned_up");
         }
 
         for (auto i = 0; i < partition_count; ++i) {
@@ -181,7 +181,7 @@ bool query_bulk_load_status(command_executor *e, shell_context *sc, arguments ar
             if (print_cleanup_flag) {
                 bool is_cleanup = (states.size() == resp.max_replica_count);
                 for (const auto &kv : states) {
-                    is_cleanup = is_cleanup && kv.second.is_cleanuped;
+                    is_cleanup = is_cleanup && kv.second.is_cleaned_up;
                 }
                 tp_all.append_data(is_cleanup ? "YES" : "NO");
             }
@@ -213,7 +213,7 @@ bool query_bulk_load_status(command_executor *e, shell_context *sc, arguments ar
                 tp_single.add_column("ingestion_status");
             }
             if (p_cleanup_flag) {
-                tp_single.add_column("context_cleanuped");
+                tp_single.add_column("is_cleaned_up");
             }
             if (p_pause_flag) {
                 tp_single.add_column("is_paused");
@@ -230,7 +230,7 @@ bool query_bulk_load_status(command_executor *e, shell_context *sc, arguments ar
                     tp_single.append_data(get_short_status(iter->second.ingest_status));
                 }
                 if (p_cleanup_flag) {
-                    tp_single.append_data(iter->second.is_cleanuped ? "YES" : "NO");
+                    tp_single.append_data(iter->second.is_cleaned_up ? "YES" : "NO");
                 }
                 if (p_pause_flag) {
                     tp_single.append_data(iter->second.is_paused ? "YES" : "NO");
@@ -257,8 +257,8 @@ bool query_bulk_load_status(command_executor *e, shell_context *sc, arguments ar
 
 bool pause_bulk_load(command_executor *e, shell_context *sc, arguments args)
 {
-    static struct option long_options[] = {{"app_id", required_argument, 0, 'a'}, {0, 0, 0, 0}};
-    int32_t app_id = 0;
+    static struct option long_options[] = {{"app_name", required_argument, 0, 'a'}, {0, 0, 0, 0}};
+    std::string app_name;
 
     optind = 0;
     while (true) {
@@ -269,20 +269,20 @@ bool pause_bulk_load(command_executor *e, shell_context *sc, arguments args)
             break;
         switch (c) {
         case 'a':
-            app_id = boost::lexical_cast<int32_t>(optarg);
+            app_name = optarg;
             break;
         default:
             return false;
         }
     }
 
-    if (app_id <= 0) {
-        fprintf(stderr, "app_id should not be greater than zero\n");
+    if (app_name.empty()) {
+        fprintf(stderr, "app_name should not be empty\n");
         return false;
     }
 
     auto err_resp = sc->ddl_client->control_bulk_load(
-        app_id, dsn::replication::bulk_load_control_type::BLC_PAUSE);
+        app_name, dsn::replication::bulk_load_control_type::BLC_PAUSE);
     dsn::error_s err = err_resp.get_error();
     std::string hint_msg;
     if (err.is_ok()) {
@@ -300,8 +300,8 @@ bool pause_bulk_load(command_executor *e, shell_context *sc, arguments args)
 
 bool restart_bulk_load(command_executor *e, shell_context *sc, arguments args)
 {
-    static struct option long_options[] = {{"app_id", required_argument, 0, 'a'}, {0, 0, 0, 0}};
-    int32_t app_id = 0;
+    static struct option long_options[] = {{"app_name", required_argument, 0, 'a'}, {0, 0, 0, 0}};
+    std::string app_name;
 
     optind = 0;
     while (true) {
@@ -312,20 +312,20 @@ bool restart_bulk_load(command_executor *e, shell_context *sc, arguments args)
             break;
         switch (c) {
         case 'a':
-            app_id = boost::lexical_cast<int32_t>(optarg);
+            app_name = optarg;
             break;
         default:
             return false;
         }
     }
 
-    if (app_id <= 0) {
-        fprintf(stderr, "app_id should not be greater than zero\n");
+    if (app_name.empty()) {
+        fprintf(stderr, "app_name should not be empty\n");
         return false;
     }
 
     auto err_resp = sc->ddl_client->control_bulk_load(
-        app_id, dsn::replication::bulk_load_control_type::BLC_RESTART);
+        app_name, dsn::replication::bulk_load_control_type::BLC_RESTART);
     dsn::error_s err = err_resp.get_error();
     std::string hint_msg;
     if (err.is_ok()) {
@@ -344,8 +344,8 @@ bool restart_bulk_load(command_executor *e, shell_context *sc, arguments args)
 bool cancel_bulk_load(command_executor *e, shell_context *sc, arguments args)
 {
     static struct option long_options[] = {
-        {"app_id", required_argument, 0, 'a'}, {"forced", no_argument, 0, 'f'}, {0, 0, 0, 0}};
-    int32_t app_id = 0;
+        {"app_name", required_argument, 0, 'a'}, {"forced", no_argument, 0, 'f'}, {0, 0, 0, 0}};
+    std::string app_name;
     bool forced = false;
 
     optind = 0;
@@ -357,7 +357,7 @@ bool cancel_bulk_load(command_executor *e, shell_context *sc, arguments args)
             break;
         switch (c) {
         case 'a':
-            app_id = boost::lexical_cast<int32_t>(optarg);
+            app_name = optarg;
             break;
         case 'f':
             forced = true;
@@ -367,14 +367,14 @@ bool cancel_bulk_load(command_executor *e, shell_context *sc, arguments args)
         }
     }
 
-    if (app_id <= 0) {
-        fprintf(stderr, "app_id should not be greater than zero\n");
+    if (app_name.empty()) {
+        fprintf(stderr, "app_name should not be empty\n");
         return false;
     }
 
     auto type = forced ? dsn::replication::bulk_load_control_type::BLC_FORCE_CANCEL
                        : dsn::replication::bulk_load_control_type::BLC_CANCEL;
-    auto err_resp = sc->ddl_client->control_bulk_load(app_id, type);
+    auto err_resp = sc->ddl_client->control_bulk_load(app_name, type);
     dsn::error_s err = err_resp.get_error();
     std::string hint_msg;
     if (err.is_ok()) {

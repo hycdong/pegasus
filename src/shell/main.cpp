@@ -458,15 +458,15 @@ static command_executor commands[] = {
         query_bulk_load_status,
     },
     {
-        "pause_bulk_load", "pause app bulk load", "<-a --app_id num>", pause_bulk_load,
+        "pause_bulk_load", "pause app bulk load", "<-a --app_name str>", pause_bulk_load,
     },
     {
-        "restart_bulk_load", "restart app bulk load", "<-a --app_id num>", restart_bulk_load,
+        "restart_bulk_load", "restart app bulk load", "<-a --app_name str>", restart_bulk_load,
     },
     {
         "cancel_bulk_load",
         "cancel app bulk load",
-        "<-a --app_id num> [-f --forced]",
+        "<-a --app_name str> [-f --forced]",
         cancel_bulk_load,
     },
     {
