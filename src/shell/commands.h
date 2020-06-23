@@ -254,10 +254,10 @@ bool query_disk_replica(command_executor *e, shell_context *sc, arguments args);
 
 bool app_partition_split(command_executor *e, shell_context *sc, arguments args);
 
-bool pause_single_partition_split(command_executor *e, shell_context *sc, arguments args);
+bool query_partition_split(command_executor *e, shell_context *sc, arguments args);
 
-bool restart_single_partition_split(command_executor *e, shell_context *sc, arguments args);
+bool pause_partition_split(command_executor *e, shell_context *sc, arguments args);
 
-bool cancel_app_partition_split(command_executor *e, shell_context *sc, arguments args);
+bool restart_partition_split(command_executor *e, shell_context *sc, arguments args);
 
-bool clear_partition_split_flag(command_executor *e, shell_context *sc, arguments args);
+bool cancel_partition_split(command_executor *e, shell_context *sc, arguments args);
