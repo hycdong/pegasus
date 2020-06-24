@@ -5,7 +5,7 @@
 #include "shell/commands.h"
 #include <dsn/utility/utils.h>
 
-bool app_partition_split(command_executor *e, shell_context *sc, arguments args)
+bool start_partition_split(command_executor *e, shell_context *sc, arguments args)
 {
     static struct option long_options[] = {{"app_name", required_argument, 0, 'a'},
                                            {"new_partition_count", required_argument, 0, 'p'},
@@ -123,29 +123,23 @@ bool query_partition_split(command_executor *e, shell_context *sc, arguments arg
 
 bool pause_partition_split(command_executor *e, shell_context *sc, arguments args)
 {
-    static struct option long_options[] = {
-        {"app_name", required_argument, 0, 'a'},
-        {"partition_count_before_split", required_argument, 0, 'p'},
-        {"parent_partition_index", required_argument, 0, 'i'},
-        {0, 0, 0, 0}};
+    static struct option long_options[] = {{"app_name", required_argument, 0, 'a'},
+                                           {"parent_partition_index", required_argument, 0, 'i'},
+                                           {0, 0, 0, 0}};
 
     std::string app_name;
-    int32_t partition_count_before_split = 0;
     int32_t pidx = -1;
 
     optind = 0;
     while (true) {
         int option_index = 0;
         int c;
-        c = getopt_long(args.argc, args.argv, "a:p:i:", long_options, &option_index);
+        c = getopt_long(args.argc, args.argv, "a:i:", long_options, &option_index);
         if (c == -1)
             break;
         switch (c) {
         case 'a':
             app_name = optarg;
-            break;
-        case 'p':
-            partition_count_before_split = boost::lexical_cast<int32_t>(optarg);
             break;
         case 'i':
             pidx = boost::lexical_cast<int32_t>(optarg);
@@ -160,8 +154,8 @@ bool pause_partition_split(command_executor *e, shell_context *sc, arguments arg
         return false;
     }
 
-    auto err_resp = sc->ddl_client->control_partition_split(
-        app_name, partition_count_before_split, pidx, split_control_type::PSC_PAUSE);
+    auto err_resp =
+        sc->ddl_client->control_partition_split(app_name, split_control_type::PSC_PAUSE, pidx);
     dsn::error_s err = err_resp.get_error();
     auto resp = err_resp.get_value();
 
@@ -181,29 +175,23 @@ bool pause_partition_split(command_executor *e, shell_context *sc, arguments arg
 
 bool restart_partition_split(command_executor *e, shell_context *sc, arguments args)
 {
-    static struct option long_options[] = {
-        {"app_name", required_argument, 0, 'a'},
-        {"partition_count_before_split", required_argument, 0, 'p'},
-        {"parent_partition_index", required_argument, 0, 'i'},
-        {0, 0, 0, 0}};
+    static struct option long_options[] = {{"app_name", required_argument, 0, 'a'},
+                                           {"parent_partition_index", required_argument, 0, 'i'},
+                                           {0, 0, 0, 0}};
 
     std::string app_name;
-    int32_t partition_count_before_split = 0;
     int32_t pidx = -1;
 
     optind = 0;
     while (true) {
         int option_index = 0;
         int c;
-        c = getopt_long(args.argc, args.argv, "a:p:i:", long_options, &option_index);
+        c = getopt_long(args.argc, args.argv, "a:i:", long_options, &option_index);
         if (c == -1)
             break;
         switch (c) {
         case 'a':
             app_name = optarg;
-            break;
-        case 'p':
-            partition_count_before_split = boost::lexical_cast<int32_t>(optarg);
             break;
         case 'i':
             pidx = boost::lexical_cast<int32_t>(optarg);
@@ -218,8 +206,8 @@ bool restart_partition_split(command_executor *e, shell_context *sc, arguments a
         return false;
     }
 
-    auto err_resp = sc->ddl_client->control_partition_split(
-        app_name, partition_count_before_split, pidx, split_control_type::PSC_RESTART);
+    auto err_resp =
+        sc->ddl_client->control_partition_split(app_name, split_control_type::PSC_RESTART, pidx);
     dsn::error_s err = err_resp.get_error();
     auto resp = err_resp.get_value();
 
@@ -240,19 +228,18 @@ bool restart_partition_split(command_executor *e, shell_context *sc, arguments a
 
 bool cancel_partition_split(command_executor *e, shell_context *sc, arguments args)
 {
-    static struct option long_options[] = {
-        {"app_name", required_argument, 0, 'a'},
-        {"partition_count_before_split", required_argument, 0, 'p'},
-        {0, 0, 0, 0}};
+    static struct option long_options[] = {{"app_name", required_argument, 0, 'a'},
+                                           {"old_partition_count", required_argument, 0, 'p'},
+                                           {0, 0, 0, 0}};
 
     std::string app_name;
-    int32_t partition_count_before_split = 0;
+    int32_t old_partition_count = 0;
 
     optind = 0;
     while (true) {
         int option_index = 0;
         int c;
-        c = getopt_long(args.argc, args.argv, "a:p:", long_options, &option_index);
+        c = getopt_long(args.argc, args.argv, "a:", long_options, &option_index);
         if (c == -1)
             break;
         switch (c) {
@@ -260,7 +247,7 @@ bool cancel_partition_split(command_executor *e, shell_context *sc, arguments ar
             app_name = optarg;
             break;
         case 'p':
-            partition_count_before_split = boost::lexical_cast<int32_t>(optarg);
+            old_partition_count = boost::lexical_cast<int32_t>(optarg);
             break;
         default:
             return false;
@@ -273,7 +260,7 @@ bool cancel_partition_split(command_executor *e, shell_context *sc, arguments ar
     }
 
     auto err_resp = sc->ddl_client->control_partition_split(
-        app_name, partition_count_before_split, -1, split_control_type::PSC_CANCEL);
+        app_name, split_control_type::PSC_CANCEL, -1, old_partition_count);
     dsn::error_s err = err_resp.get_error();
     auto resp = err_resp.get_value();
 

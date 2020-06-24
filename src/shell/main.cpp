@@ -449,7 +449,7 @@ static command_executor commands[] = {
         "start_partition_split",
         "start partition split",
         "<-a|--app_name str> <-p|--new_partition_count num>",
-        app_partition_split,
+        start_partition_split,
     },
     {
         "query_partition_split",
@@ -460,21 +460,19 @@ static command_executor commands[] = {
     {
         "pause_partition_split",
         "pause partition split",
-        "<-a|--app_name str> <-p|--partition_count_before_split num> [-i|--parent_partition_index "
-        "num]",
+        "<-a|--app_name str> [-i|--parent_partition_index num]",
         pause_partition_split,
     },
     {
         "restart_partition_split",
         "restart partition split",
-        "<-a|--app_name str> <-p|--partition_count_before_split num> [-i|--parent_partition_index "
-        "num]",
+        "<-a|--app_name str> [-i|--parent_partition_index num]",
         restart_partition_split,
     },
     {
         "cancel_partition_split",
         "cancel partition split",
-        "<-a|--app_name str> <-p|--partition_count_before_split num>",
+        "<-a|--app_name str> <-p|--old_partition_count num>",
         cancel_partition_split,
     },
     {

@@ -252,7 +252,7 @@ bool query_disk_replica(command_executor *e, shell_context *sc, arguments args);
 
 // == partition_split (see 'commands/partition_split.cpp') == //
 
-bool app_partition_split(command_executor *e, shell_context *sc, arguments args);
+bool start_partition_split(command_executor *e, shell_context *sc, arguments args);
 
 bool query_partition_split(command_executor *e, shell_context *sc, arguments args);
 
