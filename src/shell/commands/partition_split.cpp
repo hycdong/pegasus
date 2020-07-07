@@ -239,7 +239,7 @@ bool cancel_partition_split(command_executor *e, shell_context *sc, arguments ar
     while (true) {
         int option_index = 0;
         int c;
-        c = getopt_long(args.argc, args.argv, "a:", long_options, &option_index);
+        c = getopt_long(args.argc, args.argv, "a:p:", long_options, &option_index);
         if (c == -1)
             break;
         switch (c) {
