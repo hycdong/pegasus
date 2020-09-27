@@ -280,14 +280,15 @@ static command_executor commands[] = {
     {
         "count_data",
         "get app row count",
-        "[-p|--partition num] [-b|--max_batch_count num] [-t|--timeout_ms num] "
+        "[-c|--precise][-p|--partition num] "
+        "[-b|--max_batch_count num][-t|--timeout_ms num] "
         "[-h|--hash_key_filter_type anywhere|prefix|postfix] "
         "[-x|--hash_key_filter_pattern str] "
         "[-s|--sort_key_filter_type anywhere|prefix|postfix|exact] "
         "[-y|--sort_key_filter_pattern str] "
         "[-v|--value_filter_type anywhere|prefix|postfix|exact] "
-        "[-z|--value_filter_pattern str] "
-        "[-d|--diff_hash_key] [-a|--stat_size] [-n|--top_count num] [-r|--run_seconds num]",
+        "[-z|--value_filter_pattern str][-d|--diff_hash_key] "
+        "[-a|--stat_size] [-n|--top_count num] [-r|--run_seconds num]",
         data_operations,
     },
     {
@@ -445,6 +446,10 @@ static command_executor commands[] = {
      "query disk replica count info",
      "[-n|--node replica_server(ip:port)][-a|-app app_name][-o|--out file_name][-j|--json]",
      query_disk_replica},
+    {"set_dup_fail_mode",
+     "set fail_mode of duplication",
+     "<app_name> <dup_id> <slow|skip>",
+     set_dup_fail_mode},
     {
         "start_partition_split",
         "start partition split",

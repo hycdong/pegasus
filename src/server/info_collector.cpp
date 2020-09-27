@@ -10,6 +10,7 @@
 #include <chrono>
 #include <dsn/tool-api/group_address.h>
 #include <dsn/dist/replication/duplication_common.h>
+#include <dsn/dist/fmt_logging.h>
 
 #include "base/pegasus_const.h"
 #include "result_writer.h"
@@ -196,6 +197,9 @@ info_collector::app_stat_counters *info_collector::get_app_counters(const std::s
     INIT_COUNTER(check_and_set_qps);
     INIT_COUNTER(check_and_mutate_qps);
     INIT_COUNTER(scan_qps);
+    INIT_COUNTER(duplicate_qps);
+    INIT_COUNTER(dup_shipped_ops);
+    INIT_COUNTER(dup_failed_shipping_ops);
     INIT_COUNTER(recent_read_cu);
     INIT_COUNTER(recent_write_cu);
     INIT_COUNTER(recent_expire_count);
@@ -209,6 +213,9 @@ info_collector::app_stat_counters *info_collector::get_app_counters(const std::s
     INIT_COUNTER(rdb_index_and_filter_blocks_mem_usage);
     INIT_COUNTER(rdb_memtable_mem_usage);
     INIT_COUNTER(rdb_estimate_num_keys);
+    INIT_COUNTER(rdb_bf_seek_negatives_rate);
+    INIT_COUNTER(rdb_bf_point_negatives_rate);
+    INIT_COUNTER(rdb_bf_point_false_positive_rate);
     INIT_COUNTER(read_qps);
     INIT_COUNTER(write_qps);
     INIT_COUNTER(backup_request_qps);
@@ -298,7 +305,9 @@ void info_collector::on_storage_size_stat(int remaining_retry_count)
 hotspot_calculator *info_collector::get_hotspot_calculator(const std::string &app_name,
                                                            const int partition_num)
 {
-    auto iter = _hotspot_calculator_store.find(app_name);
+    // use appname+partition_num as a key can prevent the impact of dynamic partition changes
+    std::string app_name_pcount = fmt::format("{}.{}", app_name, partition_num);
+    auto iter = _hotspot_calculator_store.find(app_name_pcount);
     if (iter != _hotspot_calculator_store.end()) {
         return iter->second;
     }
@@ -309,12 +318,12 @@ hotspot_calculator *info_collector::get_hotspot_calculator(const std::string &ap
         policy.reset(new hotspot_algo_qps_skew());
     } else {
         dwarn("hotspot detection is disabled");
-        _hotspot_calculator_store[app_name] = nullptr;
+        _hotspot_calculator_store[app_name_pcount] = nullptr;
         return nullptr;
     }
     hotspot_calculator *calculator =
-        new hotspot_calculator(app_name, partition_num, std::move(policy));
-    _hotspot_calculator_store[app_name] = calculator;
+        new hotspot_calculator(app_name_pcount, partition_num, std::move(policy));
+    _hotspot_calculator_store[app_name_pcount] = calculator;
     return calculator;
 }
 

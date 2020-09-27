@@ -31,6 +31,11 @@ class info_collector
 public:
     struct app_stat_counters
     {
+        double convert_to_1M_ratio(double hit, double total)
+        {
+            return std::abs(total) < 1e-6 ? 0 : hit / total * 1e6;
+        }
+
         void set(const table_stats &row_stats)
         {
             get_qps->set(row_stats.total_get_qps);
@@ -43,6 +48,9 @@ public:
             check_and_set_qps->set(row_stats.total_check_and_set_qps);
             check_and_mutate_qps->set(row_stats.total_check_and_mutate_qps);
             scan_qps->set(row_stats.total_scan_qps);
+            duplicate_qps->set(row_stats.total_duplicate_qps);
+            dup_shipped_ops->set(row_stats.total_dup_shipped_ops);
+            dup_failed_shipping_ops->set(row_stats.total_dup_failed_shipping_ops);
             recent_read_cu->set(row_stats.total_recent_read_cu);
             recent_write_cu->set(row_stats.total_recent_write_cu);
             recent_expire_count->set(row_stats.total_recent_expire_count);
@@ -55,14 +63,24 @@ public:
             storage_mb->set(row_stats.total_storage_mb);
             storage_count->set(row_stats.total_storage_count);
             rdb_block_cache_hit_rate->set(
-                std::abs(row_stats.total_rdb_block_cache_total_count) < 1e-6
-                    ? 0
-                    : row_stats.total_rdb_block_cache_hit_count /
-                          row_stats.total_rdb_block_cache_total_count * 1000000);
+                convert_to_1M_ratio(row_stats.total_rdb_block_cache_hit_count,
+                                    row_stats.total_rdb_block_cache_total_count));
             rdb_index_and_filter_blocks_mem_usage->set(
                 row_stats.total_rdb_index_and_filter_blocks_mem_usage);
             rdb_memtable_mem_usage->set(row_stats.total_rdb_memtable_mem_usage);
             rdb_estimate_num_keys->set(row_stats.total_rdb_estimate_num_keys);
+            rdb_bf_seek_negatives_rate->set(convert_to_1M_ratio(
+                row_stats.total_rdb_bf_seek_negatives, row_stats.total_rdb_bf_seek_total));
+            rdb_bf_point_negatives_rate->set(
+                convert_to_1M_ratio(row_stats.total_rdb_bf_point_negatives,
+                                    row_stats.total_rdb_bf_point_negatives +
+                                        row_stats.total_rdb_bf_point_positive_total));
+            rdb_bf_point_false_positive_rate->set(
+                convert_to_1M_ratio(row_stats.total_rdb_bf_point_positive_total -
+                                        row_stats.total_rdb_bf_point_positive_true,
+                                    (row_stats.total_rdb_bf_point_positive_total -
+                                     row_stats.total_rdb_bf_point_positive_true) +
+                                        row_stats.total_rdb_bf_point_negatives));
             read_qps->set(row_stats.get_total_read_qps());
             write_qps->set(row_stats.get_total_write_qps());
             backup_request_qps->set(row_stats.total_backup_request_qps);
@@ -87,6 +105,9 @@ public:
         ::dsn::perf_counter_wrapper check_and_set_qps;
         ::dsn::perf_counter_wrapper check_and_mutate_qps;
         ::dsn::perf_counter_wrapper scan_qps;
+        ::dsn::perf_counter_wrapper duplicate_qps;
+        ::dsn::perf_counter_wrapper dup_shipped_ops;
+        ::dsn::perf_counter_wrapper dup_failed_shipping_ops;
         ::dsn::perf_counter_wrapper recent_read_cu;
         ::dsn::perf_counter_wrapper recent_write_cu;
         ::dsn::perf_counter_wrapper recent_expire_count;
@@ -101,9 +122,13 @@ public:
         ::dsn::perf_counter_wrapper rdb_index_and_filter_blocks_mem_usage;
         ::dsn::perf_counter_wrapper rdb_memtable_mem_usage;
         ::dsn::perf_counter_wrapper rdb_estimate_num_keys;
+        ::dsn::perf_counter_wrapper rdb_bf_seek_negatives_rate;
+        ::dsn::perf_counter_wrapper rdb_bf_point_negatives_rate;
+        ::dsn::perf_counter_wrapper rdb_bf_point_false_positive_rate;
         ::dsn::perf_counter_wrapper read_qps;
         ::dsn::perf_counter_wrapper write_qps;
         ::dsn::perf_counter_wrapper backup_request_qps;
+
         ::dsn::perf_counter_wrapper get_bytes;
         ::dsn::perf_counter_wrapper multi_get_bytes;
         ::dsn::perf_counter_wrapper scan_bytes;

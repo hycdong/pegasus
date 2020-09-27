@@ -1,6 +1,7 @@
 set(MY_PROJ_NAME pegasus_unit_test)
 
 set(MY_PROJ_SRC "../pegasus_server_impl.cpp"
+                "../pegasus_server_impl_init.cpp"
                 "../pegasus_manual_compact_service.cpp"
                 "../pegasus_event_listener.cpp"
                 "../pegasus_write_service.cpp"
@@ -8,6 +9,7 @@ set(MY_PROJ_SRC "../pegasus_server_impl.cpp"
                 "../capacity_unit_calculator.cpp"
                 "../pegasus_mutation_duplicator.cpp"
                 "../table_hotspot_policy.cpp"
+                "../meta_store.cpp"
 )
 
 set(MY_SRC_SEARCH_MODE "GLOB")
