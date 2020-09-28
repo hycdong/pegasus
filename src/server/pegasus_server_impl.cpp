@@ -1388,6 +1388,8 @@ void pegasus_server_impl::on_clear_scanner(const int64_t &args) { _context_cache
 
     // only enable filter after correct pegasus_data_version set
     _key_ttl_compaction_filter_factory->SetPegasusDataVersion(_pegasus_data_version);
+    _key_ttl_compaction_filter_factory->SetPartitionIndex(_gpid.get_partition_index());
+    _key_ttl_compaction_filter_factory->SetPartitionVersion(_gpid.get_partition_index() - 1);
     _key_ttl_compaction_filter_factory->EnableFilter();
 
     // update LastManualCompactFinishTime
@@ -2599,7 +2601,7 @@ rocksdb::Status pegasus_server_impl::check_key_hash_match(const T &key)
         return rocksdb::Status::NotFound();
     }
 
-    return rocksdb::Status::OK(); 
+    return rocksdb::Status::OK();
 }
 
 ::dsn::error_code pegasus_server_impl::check_meta_cf(const std::string &path,

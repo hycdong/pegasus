@@ -22,12 +22,12 @@ public:
     KeyWithTTLCompactionFilter(uint32_t pegasus_data_version,
                                uint32_t default_ttl,
                                bool enabled,
-                               uint32_t partition_id,
-                               uint32_t partition_version)
+                               int32_t partition_index,
+                               int32_t partition_version)
         : _pegasus_data_version(pegasus_data_version),
           _default_ttl(default_ttl),
           _enabled(enabled),
-          _partition_id(partition_id),
+          _partition_index(partition_index),
           _partition_version(partition_version)
 
     {
@@ -60,17 +60,18 @@ public:
 
         // _partition_version < 0 indicate current partition not in service
         // if current partition not served this key, return true immediately
-        if (_partition_version > 0 && _partition_id <= _partition_version) {
+        if (_partition_version > 0 && _partition_index <= _partition_version) {
             if (key.size() < 2) {
                 return true;
             } else {
-                uint32_t hash_num = (uint32_t)pegasus_key_hash(key);
-                if ((hash_num & _partition_version) != _partition_id) {
+                auto hash_num = pegasus_key_hash(key);
+                if ((hash_num & _partition_version) != _partition_index) {
+                    // TODO(heyuchen): test
                     dinfo("this value will be removed, hash_num is %d, _partition_version=%d, "
-                          "_partition_id=%d",
-                          hash_num,
-                          _partition_version,
-                          _partition_id);
+                           "_partition_id=%d",
+                           hash_num,
+                           _partition_version,
+                           _partition_index);
                     return true;
                 }
             }
@@ -86,8 +87,8 @@ private:
     bool _enabled; // only process filtering when _enabled == true
     mutable pegasus_value_generator _gen;
 
-    uint32_t _partition_id;
-    uint32_t _partition_version;
+    int32_t _partition_index;
+    int32_t _partition_version;
 };
 
 class KeyWithTTLCompactionFilterFactory : public rocksdb::CompactionFilterFactory
@@ -103,7 +104,7 @@ public:
             new KeyWithTTLCompactionFilter(_pegasus_data_version.load(),
                                            _default_ttl.load(),
                                            _enabled.load(),
-                                           _partition_id.load(),
+                                           _partition_index.load(),
                                            _partition_version.load()));
     }
     const char *Name() const override { return "KeyWithTTLCompactionFilterFactory"; }
@@ -114,8 +115,8 @@ public:
     }
     void EnableFilter() { _enabled.store(true, std::memory_order_release); }
     void SetDefaultTTL(uint32_t ttl) { _default_ttl.store(ttl, std::memory_order_release); }
-    void SetPartitionId(uint32_t partition_id) { _partition_id.store(partition_id); }
-    void SetPartitionVersion(uint32_t partition_version)
+    void SetPartitionIndex(int32_t partition_index) { _partition_index.store(partition_index); }
+    void SetPartitionVersion(int32_t partition_version)
     {
         _partition_version.store(partition_version);
     }
@@ -125,8 +126,8 @@ private:
     std::atomic<uint32_t> _default_ttl;
     std::atomic_bool _enabled; // only process filtering when _enabled == true
 
-    std::atomic<uint32_t> _partition_id;
-    std::atomic<uint32_t> _partition_version;
+    std::atomic<int32_t> _partition_index;
+    std::atomic<int32_t> _partition_version;
 };
 
 } // namespace server

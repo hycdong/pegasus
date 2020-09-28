@@ -303,7 +303,7 @@ private:
         }
 
         return false;
-    } 
+    }
 
     ::dsn::error_code check_meta_cf(const std::string &path, bool *need_create_meta_cf);
 
