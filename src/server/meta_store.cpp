@@ -10,14 +10,6 @@
 namespace pegasus {
 namespace server {
 
-DSN_DEFINE_string("pegasus.server",
-                  get_meta_store_type,
-                  "manifest",
-                  "Where to get meta data, now support 'manifest' and 'metacf'");
-DSN_DEFINE_validator(get_meta_store_type, [](const char *type) {
-    return strcmp(type, "manifest") == 0 || strcmp(type, "metacf") == 0;
-});
-
 const std::string meta_store::DATA_VERSION = "pegasus_data_version";
 const std::string meta_store::LAST_FLUSHED_DECREE = "pegasus_last_flushed_decree";
 const std::string meta_store::LAST_MANUAL_COMPACT_FINISH_TIME =
@@ -30,78 +22,100 @@ meta_store::meta_store(pegasus_server_impl *server,
 {
     // disable write ahead logging as replication handles logging instead now
     _wt_opts.disableWAL = true;
-    _get_meta_store_type =
-        (strcmp(FLAGS_get_meta_store_type, "manifest") == 0 ? meta_store_type::kManifestOnly
-                                                            : meta_store_type::kMetaCFOnly);
 }
 
 uint64_t meta_store::get_last_flushed_decree() const
 {
-    switch (_get_meta_store_type) {
-    case meta_store_type::kManifestOnly:
-        return _db->GetLastFlushedDecree();
-    case meta_store_type::kMetaCFOnly: {
-        uint64_t last_flushed_decree = 0;
-        auto ec = get_value_from_meta_cf(true, LAST_FLUSHED_DECREE, &last_flushed_decree);
-        dcheck_eq_replica(::dsn::ERR_OK, ec);
-        return last_flushed_decree;
-    }
-    default:
-        __builtin_unreachable();
-    }
+    uint64_t last_flushed_decree = 0;
+    auto ec = get_value_from_meta_cf(true, LAST_FLUSHED_DECREE, &last_flushed_decree);
+    dcheck_eq_replica(::dsn::ERR_OK, ec);
+    return last_flushed_decree;
 }
 
 uint32_t meta_store::get_data_version() const
 {
-    switch (_get_meta_store_type) {
-    case meta_store_type::kManifestOnly:
-        return _db->GetPegasusDataVersion();
-    case meta_store_type::kMetaCFOnly: {
-        uint64_t pegasus_data_version = 0;
-        auto ec = get_value_from_meta_cf(false, DATA_VERSION, &pegasus_data_version);
-        dcheck_eq_replica(::dsn::ERR_OK, ec);
-        return static_cast<uint32_t>(pegasus_data_version);
-    }
-    default:
-        __builtin_unreachable();
-    }
+    uint64_t pegasus_data_version = 0;
+    auto ec = get_value_from_meta_cf(false, DATA_VERSION, &pegasus_data_version);
+    dcheck_eq_replica(::dsn::ERR_OK, ec);
+    return static_cast<uint32_t>(pegasus_data_version);
 }
 
 uint64_t meta_store::get_last_manual_compact_finish_time() const
 {
-    switch (_get_meta_store_type) {
-    case meta_store_type::kManifestOnly:
-        return _db->GetLastManualCompactFinishTime();
-    case meta_store_type::kMetaCFOnly: {
-        uint64_t last_manual_compact_finish_time = 0;
-        auto ec = get_value_from_meta_cf(
-            false, LAST_MANUAL_COMPACT_FINISH_TIME, &last_manual_compact_finish_time);
-        dcheck_eq_replica(::dsn::ERR_OK, ec);
-        return last_manual_compact_finish_time;
-    }
-    default:
-        __builtin_unreachable();
-    }
+    uint64_t last_manual_compact_finish_time = 0;
+    auto ec = get_value_from_meta_cf(
+        false, LAST_MANUAL_COMPACT_FINISH_TIME, &last_manual_compact_finish_time);
+    dcheck_eq_replica(::dsn::ERR_OK, ec);
+    return last_manual_compact_finish_time;
+}
+
+uint64_t meta_store::get_decree_from_readonly_db(rocksdb::DB *db,
+                                                 rocksdb::ColumnFamilyHandle *meta_cf) const
+{
+    uint64_t last_flushed_decree = 0;
+    auto ec = get_value_from_meta_cf(db, meta_cf, true, LAST_FLUSHED_DECREE, &last_flushed_decree);
+    dcheck_eq_replica(::dsn::ERR_OK, ec);
+    return last_flushed_decree;
+}
+
+std::string meta_store::get_usage_scenario() const
+{
+    // If couldn't find rocksdb usage scenario in meta column family, return normal in default.
+    std::string usage_scenario = ROCKSDB_ENV_USAGE_SCENARIO_NORMAL;
+    auto ec = get_string_value_from_meta_cf(false, ROCKSDB_ENV_USAGE_SCENARIO_KEY, &usage_scenario);
+    dassert_replica(ec == ::dsn::ERR_OK || ec == ::dsn::ERR_OBJECT_NOT_FOUND,
+                    "rocksdb {} get {} from meta column family failed: {}",
+                    _db->GetName(),
+                    ROCKSDB_ENV_USAGE_SCENARIO_KEY,
+                    ec.to_string());
+    return usage_scenario;
 }
 
 ::dsn::error_code meta_store::get_value_from_meta_cf(bool read_flushed_data,
                                                      const std::string &key,
                                                      uint64_t *value) const
 {
+    return get_value_from_meta_cf(_db, _meta_cf, read_flushed_data, key, value);
+}
+
+::dsn::error_code meta_store::get_value_from_meta_cf(rocksdb::DB *db,
+                                                     rocksdb::ColumnFamilyHandle *cf,
+                                                     bool read_flushed_data,
+                                                     const std::string &key,
+                                                     uint64_t *value)
+{
     std::string data;
+    auto ec = get_string_value_from_meta_cf(db, cf, read_flushed_data, key, &data);
+    if (ec != ::dsn::ERR_OK) {
+        return ec;
+    }
+    dassert_f(dsn::buf2uint64(data, *value),
+              "rocksdb {} get \"{}\" from meta column family failed to parse into uint64",
+              db->GetName(),
+              data);
+    return ::dsn::ERR_OK;
+}
+
+::dsn::error_code meta_store::get_string_value_from_meta_cf(bool read_flushed_data,
+                                                            const std::string &key,
+                                                            std::string *value) const
+{
+    return get_string_value_from_meta_cf(_db, _meta_cf, read_flushed_data, key, value);
+}
+
+::dsn::error_code meta_store::get_string_value_from_meta_cf(rocksdb::DB *db,
+                                                            rocksdb::ColumnFamilyHandle *cf,
+                                                            bool read_flushed_data,
+                                                            const std::string &key,
+                                                            std::string *value)
+{
     rocksdb::ReadOptions rd_opts;
     if (read_flushed_data) {
         // only read 'flushed' data, mainly to read 'last_flushed_decree'
         rd_opts.read_tier = rocksdb::kPersistedTier;
     }
-    auto status = _db->Get(rd_opts, _meta_cf, key, &data);
+    auto status = db->Get(rd_opts, cf, key, value);
     if (status.ok()) {
-        bool ok = dsn::buf2uint64(data, *value);
-        dassert_replica(ok,
-                        "rocksdb {} get {} from meta column family got error value {}",
-                        _db->GetName(),
-                        key,
-                        data);
         return ::dsn::ERR_OK;
     }
 
@@ -115,7 +129,13 @@ uint64_t meta_store::get_last_manual_compact_finish_time() const
 
 ::dsn::error_code meta_store::set_value_to_meta_cf(const std::string &key, uint64_t value) const
 {
-    auto status = _db->Put(_wt_opts, _meta_cf, key, std::to_string(value));
+    return set_string_value_to_meta_cf(key, std::to_string(value));
+}
+
+::dsn::error_code meta_store::set_string_value_to_meta_cf(const std::string &key,
+                                                          const std::string &value) const
+{
+    auto status = _db->Put(_wt_opts, _meta_cf, key, value);
     if (!status.ok()) {
         derror_replica(
             "Put {}={} to meta column family failed, status {}", key, value, status.ToString());
@@ -140,6 +160,12 @@ void meta_store::set_last_manual_compact_finish_time(uint64_t last_manual_compac
     dcheck_eq_replica(
         ::dsn::ERR_OK,
         set_value_to_meta_cf(LAST_MANUAL_COMPACT_FINISH_TIME, last_manual_compact_finish_time));
+}
+
+void meta_store::set_usage_scenario(const std::string &usage_scenario) const
+{
+    dcheck_eq_replica(::dsn::ERR_OK,
+                      set_string_value_to_meta_cf(ROCKSDB_ENV_USAGE_SCENARIO_KEY, usage_scenario));
 }
 
 } // namespace server

@@ -15,7 +15,6 @@
 #include <dsn/utility/output_utils.h>
 #include <dsn/utility/string_conv.h>
 #include <dsn/utility/string_view.h>
-#include <dsn/dist/cli/cli.client.h>
 #include <dsn/dist/replication/replication_ddl_client.h>
 #include <dsn/dist/replication/mutation_log_tool.h>
 
@@ -251,6 +250,18 @@ bool set_dup_fail_mode(command_executor *e, shell_context *sc, arguments args);
 bool query_disk_capacity(command_executor *e, shell_context *sc, arguments args);
 
 bool query_disk_replica(command_executor *e, shell_context *sc, arguments args);
+
+// == bulk load (see 'commands/bulk_load.cpp') == //
+
+bool start_bulk_load(command_executor *e, shell_context *sc, arguments args);
+
+bool query_bulk_load_status(command_executor *e, shell_context *sc, arguments args);
+
+bool pause_bulk_load(command_executor *e, shell_context *sc, arguments args);
+
+bool restart_bulk_load(command_executor *e, shell_context *sc, arguments args);
+
+bool cancel_bulk_load(command_executor *e, shell_context *sc, arguments args);
 
 // == partition_split (see 'commands/partition_split.cpp') == //
 

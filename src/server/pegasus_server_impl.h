@@ -12,14 +12,15 @@
 #include <dsn/perf_counter/perf_counter_wrapper.h>
 #include <dsn/dist/replication/replication.codes.h>
 #include <rrdb/rrdb_types.h>
-#include <rrdb/rrdb.server.h>
 #include <gtest/gtest_prod.h>
+#include <rocksdb/rate_limiter.h>
 
 #include "key_ttl_compaction_filter.h"
 #include "pegasus_scan_context.h"
 #include "pegasus_manual_compact_service.h"
 #include "pegasus_write_service.h"
 #include "range_read_limiter.h"
+#include "pegasus_read_service.h"
 
 namespace pegasus {
 namespace server {
@@ -28,7 +29,7 @@ class meta_store;
 class capacity_unit_calculator;
 class pegasus_server_write;
 
-class pegasus_server_impl : public ::dsn::apps::rrdb_service
+class pegasus_server_impl : public pegasus_read_service
 {
 public:
     static void register_service()
@@ -42,18 +43,12 @@ public:
     ~pegasus_server_impl() override;
 
     // the following methods may set physical error if internal error occurs
-    void on_get(const ::dsn::blob &key,
-                ::dsn::rpc_replier<::dsn::apps::read_response> &reply) override;
-    void on_multi_get(const ::dsn::apps::multi_get_request &args,
-                      ::dsn::rpc_replier<::dsn::apps::multi_get_response> &reply) override;
-    void on_sortkey_count(const ::dsn::blob &args,
-                          ::dsn::rpc_replier<::dsn::apps::count_response> &reply) override;
-    void on_ttl(const ::dsn::blob &key,
-                ::dsn::rpc_replier<::dsn::apps::ttl_response> &reply) override;
-    void on_get_scanner(const ::dsn::apps::get_scanner_request &args,
-                        ::dsn::rpc_replier<::dsn::apps::scan_response> &reply) override;
-    void on_scan(const ::dsn::apps::scan_request &args,
-                 ::dsn::rpc_replier<::dsn::apps::scan_response> &reply) override;
+    void on_get(get_rpc rpc) override;
+    void on_multi_get(multi_get_rpc rpc) override;
+    void on_sortkey_count(sortkey_count_rpc rpc) override;
+    void on_ttl(ttl_rpc rpc) override;
+    void on_get_scanner(get_scanner_rpc rpc) override;
+    void on_scan(scan_rpc rpc) override;
     void on_clear_scanner(const int64_t &args) override;
 
     // input:
@@ -158,11 +153,22 @@ public:
 
     std::string dump_write_request(dsn::message_ex *request) override;
 
+    // Not thread-safe
+    void set_ingestion_status(dsn::replication::ingestion_status::type status) override;
+
+    dsn::replication::ingestion_status::type get_ingestion_status() override
+    {
+        return _ingestion_status;
+    }
+
 private:
     friend class manual_compact_service_test;
     friend class pegasus_compression_options_test;
     friend class pegasus_server_impl_test;
     FRIEND_TEST(pegasus_server_impl_test, default_data_version);
+    FRIEND_TEST(pegasus_server_impl_test, test_open_db_with_latest_options);
+    FRIEND_TEST(pegasus_server_impl_test, test_open_db_with_app_envs);
+    FRIEND_TEST(pegasus_server_impl_test, test_stop_db_twice);
 
     friend class pegasus_manual_compact_service;
     friend class pegasus_write_service;
@@ -260,6 +266,9 @@ private:
     // return true if successfully changed
     bool set_usage_scenario(const std::string &usage_scenario);
 
+    void reset_usage_scenario_options(const rocksdb::ColumnFamilyOptions &base_opts,
+                                      rocksdb::ColumnFamilyOptions *target_opts);
+
     // return true if successfully set
     bool set_options(const std::unordered_map<std::string, std::string> &new_options);
 
@@ -305,7 +314,8 @@ private:
         return false;
     }
 
-    ::dsn::error_code check_meta_cf(const std::string &path, bool *need_create_meta_cf);
+    ::dsn::error_code
+    check_column_families(const std::string &path, bool *missing_meta_cf, bool *miss_data_cf);
 
     void release_db();
 
@@ -318,6 +328,7 @@ private:
     rocksdb::Status check_key_hash_match(const T &key);
 
 private:
+    static const std::chrono::seconds kServerStatUpdateTimeSec;
     static const std::string COMPRESSION_HEADER;
     // Column family names.
     static const std::string DATA_COLUMN_FAMILY_NAME;
@@ -347,6 +358,8 @@ private:
     rocksdb::ColumnFamilyHandle *_data_cf;
     rocksdb::ColumnFamilyHandle *_meta_cf;
     static std::shared_ptr<rocksdb::Cache> _s_block_cache;
+    static std::shared_ptr<rocksdb::RateLimiter> _s_rate_limiter;
+    static int64_t _rocksdb_limiter_last_total_through;
     volatile bool _is_open;
     uint32_t _pegasus_data_version;
     std::atomic<int64_t> _last_durable_decree;
@@ -373,6 +386,9 @@ private:
 
     std::atomic<int32_t> _partition_version;
 
+    dsn::replication::ingestion_status::type _ingestion_status{
+        dsn::replication::ingestion_status::IS_INVALID};
+
     dsn::task_tracker _tracker;
 
     // perf counters
@@ -390,6 +406,7 @@ private:
 
     // rocksdb internal statistics
     // server level
+    static ::dsn::perf_counter_wrapper _pfc_rdb_write_limiter_rate_bytes;
     static ::dsn::perf_counter_wrapper _pfc_rdb_block_cache_mem_usage;
     // replica level
     ::dsn::perf_counter_wrapper _pfc_rdb_sst_count;

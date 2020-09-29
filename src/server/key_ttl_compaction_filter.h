@@ -66,12 +66,11 @@ public:
             } else {
                 auto hash_num = pegasus_key_hash(key);
                 if ((hash_num & _partition_version) != _partition_index) {
-                    // TODO(heyuchen): test
                     dinfo("this value will be removed, hash_num is %d, _partition_version=%d, "
-                           "_partition_id=%d",
-                           hash_num,
-                           _partition_version,
-                           _partition_index);
+                          "_partition_id=%d",
+                          hash_num,
+                          _partition_version,
+                          _partition_index);
                     return true;
                 }
             }

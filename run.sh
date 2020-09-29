@@ -6,7 +6,7 @@ LOCAL_IP=`scripts/get_local_ip`
 export REPORT_DIR="$ROOT/test_report"
 export DSN_ROOT=$ROOT/DSN_ROOT
 export DSN_THIRDPARTY_ROOT=$ROOT/rdsn/thirdparty/output
-export LD_LIBRARY_PATH=$DSN_ROOT/lib:$DSN_THIRDPARTY_ROOT/lib:$BOOST_DIR/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=$DSN_ROOT/lib:$DSN_THIRDPARTY_ROOT/lib:$LD_LIBRARY_PATH
 
 function usage()
 {
@@ -58,14 +58,13 @@ function usage_build()
     echo "   -h|--help             print the help info"
     echo "   -t|--type             build type: debug|release, default is release"
     echo "   -s|--serialize        serialize type: dsn|thrift|proto, default is thrift"
-    echo "   -c|--clear            clear rdsn/rocksdb/pegasus before building, not clear thirdparty"
-    echo "   -cc|--half-clear      clear pegasus before building, not clear thirdparty/rdsn/rocksdb"
-    echo "   --clear_thirdparty    clear thirdparty/rdsn/rocksdb/pegasus before building"
+    echo "   -c|--clear            clear rdsn/pegasus before building, not clear thirdparty"
+    echo "   -cc|--half-clear      clear pegasus before building, not clear thirdparty/rdsn"
+    echo "   --clear_thirdparty    clear thirdparty/rdsn/pegasus before building"
     echo "   --compiler            specify c and cxx compiler, sperated by ','"
     echo "                         e.g., \"gcc,g++\" or \"clang-3.9,clang++-3.9\""
     echo "                         default is \"gcc,g++\""
     echo "   -j|--jobs <num>       the number of jobs to run simultaneously, default 8"
-    echo "   -b|--boost_dir <dir>  specify customized boost directory, use system boost if not set"
     echo "   -w|--warning_all      open all warnings when building, default no"
     echo "   --enable_gcov         generate gcov code coverage report, default no"
     echo "   -v|--verbose          build in verbose mode, default no"
@@ -88,7 +87,6 @@ function run_build()
     PART_CLEAR=NO
     CLEAR_THIRDPARTY=NO
     JOB_NUM=8
-    BOOST_DIR=""
     WARNING_ALL=NO
     ENABLE_GCOV=NO
     RUN_VERBOSE=NO
@@ -129,10 +127,6 @@ function run_build()
                 ;;
             -j|--jobs)
                 JOB_NUM="$2"
-                shift
-                ;;
-            -b|--boost_dir)
-                BOOST_DIR="$2"
                 shift
                 ;;
             -w|--warning_all)
@@ -193,9 +187,6 @@ function run_build()
     echo "INFO: start build rdsn..."
     cd $ROOT/rdsn
     OPT="-t $BUILD_TYPE -j $JOB_NUM --compiler $C_COMPILER,$CXX_COMPILER"
-    if [ "$BOOST_DIR" != "" ]; then
-        OPT="$OPT -b $BOOST_DIR"
-    fi
     if [ "$CLEAR" == "YES" ]; then
         OPT="$OPT -c"
     fi
@@ -226,84 +217,11 @@ function run_build()
         exit 1
     fi
 
-    echo "INFO: start build rocksdb..."
-    ROCKSDB_BUILD_DIR="$ROOT/rocksdb/build"
-    ROCKSDB_BUILD_OUTPUT="$ROCKSDB_BUILD_DIR/output"
-    CMAKE_OPTIONS="-DCMAKE_C_COMPILER=$C_COMPILER -DCMAKE_CXX_COMPILER=$CXX_COMPILER -DWITH_LZ4=ON -DWITH_ZSTD=ON -DWITH_SNAPPY=ON -DWITH_BZ2=OFF -DWITH_TESTS=OFF -DWITH_GFLAGS=OFF -DUSE_RTTI=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS=-g"
-    if [ "$WARNING_ALL" == "YES" ]
-    then
-        echo "WARNING_ALL=YES"
-        CMAKE_OPTIONS="$CMAKE_OPTIONS -DWARNING_ALL=TRUE"
-    else
-        echo "WARNING_ALL=NO"
-    fi
-    if [ "$ENABLE_GCOV" == "YES" ]
-    then
-        echo "ENABLE_GCOV=YES"
-        CMAKE_OPTIONS="$CMAKE_OPTIONS -DENABLE_GCOV=TRUE"
-    else
-        echo "ENABLE_GCOV=NO"
-    fi
-    if [ "$BUILD_TYPE" == "debug" ]
-    then
-        echo "BUILD_TYPE=debug"
-        CMAKE_OPTIONS="$CMAKE_OPTIONS -DCMAKE_BUILD_TYPE=RelWithDebInfo"
-    else
-        echo "BUILD_TYPE=release"
-    fi
-
-    if [ -f $ROCKSDB_BUILD_DIR/CMAKE_OPTIONS ]
-    then
-        LAST_OPTIONS=`cat $ROCKSDB_BUILD_DIR/CMAKE_OPTIONS`
-        if [ "$CMAKE_OPTIONS" != "$LAST_OPTIONS" ]
-        then
-            echo "WARNING: CMAKE_OPTIONS has changed from last build, clear environment first"
-            CLEAR=YES
-        fi
-    fi
-
-    if [ "$CLEAR" == "YES" ] && [ -d "$ROCKSDB_BUILD_DIR" ]
-    then
-        echo "Clear $ROCKSDB_BUILD_DIR ..."
-        rm -rf $ROCKSDB_BUILD_DIR
-    fi
-
-    if [ ! -f $ROCKSDB_BUILD_DIR/Makefile ]; then
-        echo "Running cmake..."
-        mkdir -p $ROCKSDB_BUILD_DIR
-        cd $ROCKSDB_BUILD_DIR
-        echo "$CMAKE_OPTIONS" >CMAKE_OPTIONS
-        cmake .. -DCMAKE_INSTALL_PREFIX=$ROCKSDB_BUILD_OUTPUT $CMAKE_OPTIONS
-        if [ $? -ne 0 ]; then
-            echo "ERROR: cmake failed"
-            exit 1
-        fi
-    else
-        cd $ROCKSDB_BUILD_DIR
-    fi
-
-    echo "Building..."
-    if [ "$RUN_VERBOSE" == "YES" ]
-    then
-        echo "RUN_VERBOSE=YES"
-        MAKE_OPTIONS="$MAKE_OPTIONS VERBOSE=1"
-    else
-        echo "RUN_VERBOSE=NO"
-    fi
-    make install -j $JOB_NUM $MAKE_OPTIONS
-    if [ $? -ne 0 ]
-    then
-        echo "ERROR: build rocksdb failed"
-        exit 1
-    else
-        echo "Build rocksdb succeed"
-    fi
-
     echo "INFO: start build pegasus..."
     cd $ROOT/src
     C_COMPILER="$C_COMPILER" CXX_COMPILER="$CXX_COMPILER" BUILD_TYPE="$BUILD_TYPE" \
         CLEAR="$CLEAR" PART_CLEAR="$PART_CLEAR" JOB_NUM="$JOB_NUM" \
-        BOOST_DIR="$BOOST_DIR" WARNING_ALL="$WARNING_ALL" ENABLE_GCOV="$ENABLE_GCOV" SANITIZER="$SANITIZER"\
+        WARNING_ALL="$WARNING_ALL" ENABLE_GCOV="$ENABLE_GCOV" SANITIZER="$SANITIZER"\
         RUN_VERBOSE="$RUN_VERBOSE" TEST_MODULE="$TEST_MODULE" DISABLE_GPERF="$DISABLE_GPERF" ./build.sh
     if [ $? -ne 0 ]; then
         echo "ERROR: build pegasus failed"
@@ -364,6 +282,14 @@ function run_test()
 
     if [ "$test_modules" == "" ]; then
         test_modules="pegasus_unit_test pegasus_function_test"
+    fi
+
+    if [[ "$test_modules" =~ "pegasus_function_test" && "$on_travis" == "" && ! -d "$ROOT/src/test/function_test/pegasus-bulk-load-function-test-files" ]]; then
+        echo "Start to download files used for bulk load function test"
+        wget "https://github.com/XiaoMi/pegasus-common/releases/download/deps/pegasus-bulk-load-function-test-files.zip"
+        unzip "pegasus-bulk-load-function-test-files.zip" -d "$ROOT/src/test/function_test"
+        rm "pegasus-bulk-load-function-test-files.zip"
+        echo "Prepare files used for bulk load function test succeed"
     fi
 
     echo "Test start time: `date`"

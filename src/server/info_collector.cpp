@@ -162,10 +162,10 @@ void info_collector::on_app_stat()
     }
     get_app_counters(all_stats.app_name)->set(all_stats);
 
-    ddebug("stat apps succeed, app_count = %d, total_read_qps = %.2f, total_write_qps = %.2f",
-           (int)(all_rows.size() - 1),
-           all_stats.get_total_read_qps(),
-           all_stats.get_total_write_qps());
+    ddebug_f("stat apps succeed, app_count = {}, total_read_qps = {}, total_write_qps = {}",
+             all_rows.size(),
+             all_stats.get_total_read_qps(),
+             all_stats.get_total_write_qps());
 }
 
 info_collector::app_stat_counters *info_collector::get_app_counters(const std::string &app_name)
@@ -314,15 +314,13 @@ hotspot_calculator *info_collector::get_hotspot_calculator(const std::string &ap
     std::unique_ptr<hotspot_policy> policy;
     if (_hotspot_detect_algorithm == "hotspot_algo_qps_variance") {
         policy.reset(new hotspot_algo_qps_variance());
-    } else if (_hotspot_detect_algorithm == "hotspot_algo_qps_skew") {
-        policy.reset(new hotspot_algo_qps_skew());
     } else {
         dwarn("hotspot detection is disabled");
         _hotspot_calculator_store[app_name_pcount] = nullptr;
         return nullptr;
     }
     hotspot_calculator *calculator =
-        new hotspot_calculator(app_name_pcount, partition_num, std::move(policy));
+        new hotspot_calculator(app_name, partition_num, std::move(policy));
     _hotspot_calculator_store[app_name_pcount] = calculator;
     return calculator;
 }

@@ -11,7 +11,7 @@ namespace server {
 class pegasus_server_impl_test : public pegasus_server_test_base
 {
 public:
-    pegasus_server_impl_test() : pegasus_server_test_base() { start(); }
+    pegasus_server_impl_test() : pegasus_server_test_base() {}
 
     void test_table_level_slow_query()
     {
@@ -41,14 +41,16 @@ public:
             // do on_get/on_multi_get operation,
             long before_count = _server->_pfc_recent_abnormal_count->get_integer_value();
             if (!test.is_multi_get) {
-                ::dsn::rpc_replier<::dsn::apps::read_response> reply(nullptr);
-                _server->on_get(test_key, reply);
+                get_rpc rpc(dsn::make_unique<dsn::blob>(test_key), dsn::apps::RPC_RRDB_RRDB_GET);
+                _server->on_get(rpc);
             } else {
                 ::dsn::apps::multi_get_request request;
                 request.__set_hash_key(dsn::blob(test_hash_key.data(), 0, test_hash_key.size()));
                 request.__set_sort_keys({dsn::blob(test_sort_key.data(), 0, test_sort_key.size())});
                 ::dsn::rpc_replier<::dsn::apps::multi_get_response> reply(nullptr);
-                _server->on_multi_get(request, reply);
+                multi_get_rpc rpc(dsn::make_unique<::dsn::apps::multi_get_request>(request),
+                                  dsn::apps::RPC_RRDB_RRDB_MULTI_GET);
+                _server->on_multi_get(rpc);
             }
             long after_count = _server->_pfc_recent_abnormal_count->get_integer_value();
 
@@ -57,11 +59,60 @@ public:
     }
 };
 
-TEST_F(pegasus_server_impl_test, test_table_level_slow_query) { test_table_level_slow_query(); }
+TEST_F(pegasus_server_impl_test, test_table_level_slow_query)
+{
+    start();
+    test_table_level_slow_query();
+}
 
 TEST_F(pegasus_server_impl_test, default_data_version)
 {
+    start();
     ASSERT_EQ(_server->_pegasus_data_version, 1);
+}
+
+TEST_F(pegasus_server_impl_test, test_open_db_with_latest_options)
+{
+    // open a new db with no app env.
+    start();
+    ASSERT_EQ(ROCKSDB_ENV_USAGE_SCENARIO_NORMAL, _server->_usage_scenario);
+    // set bulk_load scenario for the db.
+    ASSERT_TRUE(_server->set_usage_scenario(ROCKSDB_ENV_USAGE_SCENARIO_BULK_LOAD));
+    ASSERT_EQ(ROCKSDB_ENV_USAGE_SCENARIO_BULK_LOAD, _server->_usage_scenario);
+    rocksdb::Options opts = _server->_db->GetOptions();
+    ASSERT_EQ(1000000000, opts.level0_file_num_compaction_trigger);
+    ASSERT_EQ(true, opts.disable_auto_compactions);
+    // reopen the db.
+    _server->stop(false);
+    start();
+    ASSERT_EQ(ROCKSDB_ENV_USAGE_SCENARIO_BULK_LOAD, _server->_usage_scenario);
+    ASSERT_EQ(opts.level0_file_num_compaction_trigger,
+              _server->_db->GetOptions().level0_file_num_compaction_trigger);
+    ASSERT_EQ(opts.disable_auto_compactions, _server->_db->GetOptions().disable_auto_compactions);
+}
+
+TEST_F(pegasus_server_impl_test, test_open_db_with_app_envs)
+{
+    std::map<std::string, std::string> envs;
+    envs[ROCKSDB_ENV_USAGE_SCENARIO_KEY] = ROCKSDB_ENV_USAGE_SCENARIO_BULK_LOAD;
+    start(envs);
+    ASSERT_EQ(ROCKSDB_ENV_USAGE_SCENARIO_BULK_LOAD, _server->_usage_scenario);
+}
+
+TEST_F(pegasus_server_impl_test, test_stop_db_twice)
+{
+    start();
+    ASSERT_TRUE(_server->_is_open);
+    ASSERT_TRUE(_server->_db != nullptr);
+
+    _server->stop(false);
+    ASSERT_FALSE(_server->_is_open);
+    ASSERT_TRUE(_server->_db == nullptr);
+
+    // stop again
+    _server->stop(false);
+    ASSERT_FALSE(_server->_is_open);
+    ASSERT_TRUE(_server->_db == nullptr);
 }
 
 } // namespace server
