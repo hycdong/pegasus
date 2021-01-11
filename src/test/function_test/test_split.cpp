@@ -1,442 +1,291 @@
-// Copyright (c) 2017, Xiaomi, Inc.  All rights reserved.
-// This source code is licensed under the Apache License Version 2.0, which
-// can be found in the LICENSE file in the root directory of this source tree.
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
 
-//#include <gtest/gtest.h>
-//#include <pegasus/client.h>
-//#include <boost/lexical_cast.hpp>
+#include <gtest/gtest.h>
+#include <pegasus/client.h>
+#include <boost/lexical_cast.hpp>
 
-//#include <dsn/dist/replication/replication_ddl_client.h>
+#include <dsn/dist/replication/replication_ddl_client.h>
 
-//#include "base/pegasus_const.h"
+#include "base/pegasus_const.h"
 
-// using namespace dsn::replication;
-// using namespace pegasus;
+using namespace dsn;
+using namespace dsn::replication;
+using namespace pegasus;
 
-// int partition_count = 4;
-// extern replication_ddl_client *ddl_client;
+class partition_split_test : public testing::Test
+{
+protected:
+    void SetUp(const std::string &table_name)
+    {
+        std::vector<rpc_address> meta_list;
+        replica_helper::load_meta_servers(
+            meta_list, PEGASUS_CLUSTER_SECTION_NAME.c_str(), "mycluster");
 
-// static void create_table(std::string table_name, int partition_count)
-//{
-//    std::cerr << "create app " << table_name << std::endl;
-//    dsn::error_code error =
-//        ddl_client->create_app(table_name, "pegasus", partition_count, 3, {}, false);
-//    ASSERT_EQ(dsn::ERR_OK, error);
-//}
+        ddl_client = std::make_shared<replication_ddl_client>(meta_list);
+        create_table(table_name);
 
-// static void drop_table(std::string table_name)
-//{
-//    std::cerr << "drop app " << table_name << std::endl;
-//    dsn::error_code error = ddl_client->drop_app(table_name, 1);
-//    ASSERT_EQ(dsn::ERR_OK, error);
-//}
+        pg_client = pegasus_client_factory::get_client("mycluster", table_name.c_str());
+        write_data_before_split();
+    }
 
-// class split : public testing::Test
-//{
-// public:
-//    static void SetUpTestCase()
-//    {
-//        ddebug("SetUp...");
-//        std::vector<dsn::rpc_address> meta_list;
-//        replica_helper::load_meta_servers(
-//            meta_list, PEGASUS_CLUSTER_SECTION_NAME.c_str(), "mycluster");
-//        ddl_client = new replication_ddl_client(meta_list);
+    void TearDown(const std::string &table_name)
+    {
+        count_during_split = 0;
+        expected.clear();
+        drop_table(table_name);
+        delete pg_client;
+    }
 
-//        create_table("split_table", partition_count);
-//        create_table("scan_split", partition_count);
-//        create_table("pause_split", partition_count);
-//        create_table("cancel_split", partition_count);
-//    }
+public:
+    void create_table(const std::string &table_name)
+    {
+        error_code error =
+            ddl_client->create_app(table_name, "pegasus", partition_count, 3, {}, false);
+        ASSERT_EQ(ERR_OK, error);
+    }
 
-//    static void TearDownTestCase()
-//    {
-//        ddebug("TearDown...");
-//        drop_table("split_table");
-//        drop_table("scan_split");
-//        drop_table("pause_split");
-//        drop_table("cancel_split");
-//    }
-//};
+    void drop_table(const std::string &table_name)
+    {
+        error_code error = ddl_client->drop_app(table_name, 1);
+        ASSERT_EQ(ERR_OK, error);
+    }
 
-// TEST_F(split, basic_split)
-//{
-//    static std::map<std::string, std::map<std::string, std::string>> expected;
-//    const std::string split_table = "split_table";
-//    dsn::error_code error;
-//    pegasus::pegasus_client *pg_client =
-//        pegasus::pegasus_client_factory::get_client("mycluster", split_table.c_str());
+    void start_partition_split(const std::string &table_name)
+    {
+        auto err_resp = ddl_client->start_partition_split(table_name, partition_count * 2);
+        ASSERT_EQ(ERR_OK, err_resp.get_value().err);
+        std::cout << "Table(" << table_name << ") start partition split succeed" << std::endl;
+    }
 
-//    // write data
-//    int count = 1000, i;
-//    for (i = 0; i < count; ++i) {
-//        std::string hash_key = "hashkey" + boost::lexical_cast<std::string>(i);
-//        std::string sort_key = "sortkey" + boost::lexical_cast<std::string>(i);
-//        auto ret = pg_client->set(hash_key, sort_key, "value");
-//        expected[hash_key][sort_key] = "value";
-//        ASSERT_EQ(ret, 0);
-//    }
+    bool is_split_finished(const std::string &table_name)
+    {
+        auto err_resp = ddl_client->query_partition_split(table_name);
+        return err_resp.get_value().err == ERR_INVALID_STATE;
+    }
 
-//    // wrong partition_count
-//    error = ddl_client->app_partition_split(split_table, partition_count);
-//    ASSERT_EQ(dsn::ERR_INVALID_PARAMETERS, error);
+    bool check_partition_split_status(const std::string &table_name,
+                                      int32_t target_pidx,
+                                      split_status::type target_status)
+    {
+        auto err_resp = ddl_client->query_partition_split(table_name);
+        auto status_map = err_resp.get_value().status;
+        // single partition
+        if (target_pidx > 0) {
+            return (status_map.find(target_pidx) != status_map.end() &&
+                    status_map[target_pidx] == target_status);
+        }
 
-//    // succeed
-//    error = ddl_client->app_partition_split(split_table, partition_count * 2);
-//    ASSERT_EQ(dsn::ERR_OK, error);
+        // all partition
+        int32_t finish_count = 0;
+        for (auto i = 0; i < partition_count; ++i) {
+            if (status_map.find(i) != status_map.end() && status_map[i] == target_status) {
+                finish_count++;
+            }
+        }
+        return finish_count == partition_count;
+    }
 
-//    error = ddl_client->app_partition_split(split_table, partition_count * 2);
-//    ASSERT_EQ(dsn::ERR_INVALID_PARAMETERS, error);
+    error_code control_partition_split(const std::string &table_name,
+                                       split_control_type::type type,
+                                       int32_t parent_pidx,
+                                       int32_t old_partition_count = 0)
+    {
+        auto err_resp =
+            ddl_client->control_partition_split(table_name, type, parent_pidx, old_partition_count);
+        return err_resp.get_value().err;
+    }
 
-//    // busy
-//    error = ddl_client->app_partition_split(split_table, partition_count * 4);
-//    ASSERT_EQ(dsn::ERR_BUSY, error);
+    void write_data_before_split()
+    {
+        std::cout << "Write data before partition split......" << std::endl;
+        for (int32_t i = 0; i < dataset_count; ++i) {
+            std::string hash_key = dataset_hashkey_prefix + std::to_string(i);
+            std::string sort_key = dataset_sortkey_prefix + std::to_string(i);
+            auto ret = pg_client->set(hash_key, sort_key, data_value);
+            ASSERT_EQ(ret, PERR_OK);
+            expected[hash_key][sort_key] = data_value;
+        }
+    }
 
-//    // set during this procedure
-//    int counter = 0;
-//    bool completed = false;
-//    while (!completed) {
-//        int app_id, partition;
-//        std::vector<dsn::partition_configuration> partitions;
-//        error = ddl_client->list_app(split_table, app_id, partition, partitions);
-//        ASSERT_EQ(dsn::ERR_OK, error);
-//        ASSERT_EQ(partition, partition_count * 2);
+    void write_data_during_split()
+    {
+        std::string hash = splitting_hashkey_prefix + std::to_string(count_during_split);
+        std::string sort = splitting_sortkey_prefix + std::to_string(count_during_split);
+        auto ret = pg_client->set(hash, sort, data_value);
+        ASSERT_TRUE((ret == PERR_OK || ret == PERR_TIMEOUT));
+        if (ret == PERR_OK) {
+            expected[hash][sort] = data_value;
+            count_during_split++;
+        }
+    }
 
-//        completed = true;
-//        for (int i = 0; i < partition; ++i) {
-//            if (partitions[i].ballot == invalid_ballot) {
-//                completed = false;
-//                break;
-//            }
-//        }
+    void read_data_during_split()
+    {
+        auto index = rand() % dataset_count;
+        std::string hash = dataset_hashkey_prefix + std::to_string(index);
+        std::string sort = dataset_sortkey_prefix + std::to_string(index);
+        std::string expected_value;
+        auto ret = pg_client->get(hash, sort, expected_value);
+        ASSERT_TRUE((ret == PERR_OK || ret == PERR_TIMEOUT));
+        if (ret == PERR_OK) {
+            ASSERT_EQ(expected_value, data_value);
+        }
+    }
 
-//        if (!completed) {
-//            int ret;
-//            std::string hash = "keyh_" + boost::lexical_cast<std::string>(counter);
-//            std::string sort = "keys_" + boost::lexical_cast<std::string>(counter);
+    void verify_data_after_split()
+    {
+        std::cout << "Verify data(count=" << dataset_count + count_during_split
+                  << ") after partition split......" << std::endl;
+        verify_data(dataset_hashkey_prefix, dataset_sortkey_prefix, dataset_count);
+        verify_data(splitting_hashkey_prefix, splitting_sortkey_prefix, count_during_split);
+    }
 
-//            ret = pg_client->set(hash, sort, "value");
-//            if (ret == 0) {
-//                expected[hash][sort] = "value";
-//                std::cerr << "set " << counter << " succeed" << std::endl;
-//                counter++;
-//            } else {
-//                std::cerr << "set " << counter << " failed, error is "
-//                          << pg_client->get_error_string(ret) << std::endl;
-//            }
-//            // ok or timeout
-//            ASSERT_TRUE((ret == 0 || ret == -2));
+    void verify_data(const std::string &hashkey_prefix,
+                     const std::string &sortkey_prefix,
+                     const int32_t count)
+    {
+        for (auto i = 0; i < count; ++i) {
+            std::string hash_key = hashkey_prefix + std::to_string(i);
+            std::string sort_key = sortkey_prefix + std::to_string(i);
+            std::string expected_value;
+            auto ret = pg_client->get(hash_key, sort_key, expected_value);
+            ASSERT_EQ(ret, PERR_OK);
+            ASSERT_EQ(expected[hash_key][sort_key], expected_value);
+        }
+    }
 
-//            std::cerr << "split is not finished, wait for 1 seconds" << std::endl;
-//            std::this_thread::sleep_for(std::chrono::seconds(1));
-//        } else {
-//            std::cerr << "partition split finished" << std::endl;
-//        }
-//    }
+public:
+    std::shared_ptr<replication_ddl_client> ddl_client;
+    pegasus_client *pg_client;
+    std::unordered_map<std::string, std::unordered_map<std::string, std::string>> expected;
+    const int32_t partition_count = 4;
+    const int32_t dataset_count = 1000;
+    const std::string dataset_hashkey_prefix = "hashkey";
+    const std::string dataset_sortkey_prefix = "sortkey";
+    const std::string splitting_hashkey_prefix = "keyh_";
+    const std::string splitting_sortkey_prefix = "keys_";
+    const std::string data_value = "vaule";
+    int32_t count_during_split = 0;
+};
 
-//    // validate data after partition split
-//    for (i = 0; i < count; ++i) {
-//        std::string hash_key = "hashkey" + boost::lexical_cast<std::string>(i);
-//        std::string sort_key = "sortkey" + boost::lexical_cast<std::string>(i);
-//        std::string value;
-//        auto ret = pg_client->get(hash_key, sort_key, value);
-//        ASSERT_EQ(ret, 0);
-//        ASSERT_EQ(expected[hash_key][sort_key], value);
-//    }
+TEST_F(partition_split_test, split_with_write)
+{
+    const std::string table_name = "split_table_1";
+    SetUp(table_name);
+    start_partition_split(table_name);
+    // write data during partition split
+    do {
+        write_data_during_split();
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    } while (!is_split_finished(table_name));
+    std::cout << "Partition split succeed" << std::endl;
 
-//    for (i = 0; i < counter; ++i) {
-//        std::string hash_key = "keyh_" + boost::lexical_cast<std::string>(i);
-//        std::string sort_key = "keys_" + boost::lexical_cast<std::string>(i);
-//        std::string value;
-//        auto ret = pg_client->get(hash_key, sort_key, value);
-//        ASSERT_EQ(ret, 0);
-//        ASSERT_EQ(expected[hash_key][sort_key], value);
-//    }
-//}
+    verify_data_after_split();
+    TearDown(table_name);
+}
 
-// TEST_F(split, split_scan)
-//{
-//    static std::map<std::string, std::map<std::string, std::string>> expected;
-//    static std::map<std::string, std::map<std::string, std::string>> actual;
-//    const std::string split_table = "scan_split";
-//    dsn::error_code error;
+TEST_F(partition_split_test, split_with_read)
+{
+    const std::string table_name = "split_table_2";
+    SetUp(table_name);
+    start_partition_split(table_name);
+    // read data during partition split
+    do {
+        read_data_during_split();
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    } while (!is_split_finished(table_name));
+    std::cout << "Partition split succeed" << std::endl;
+    verify_data_after_split();
+    TearDown(table_name);
+}
 
-//    pegasus::pegasus_client *pg_client =
-//        pegasus::pegasus_client_factory::get_client("mycluster", split_table.c_str());
+TEST_F(partition_split_test, pause_split)
+{
+    const std::string table_name = "split_table_3";
+    SetUp(table_name);
+    start_partition_split(table_name);
 
-//    // write data
-//    int count = 1000, i;
-//    std::string hash_key = "hashkey";
-//    for (i = 0; i < count; ++i) {
-//        std::string sort_key = "sortkey" + boost::lexical_cast<std::string>(i);
-//        auto ret = pg_client->set(hash_key, sort_key, "value");
-//        expected[hash_key][sort_key] = "value";
-//        ASSERT_EQ(ret, 0);
-//    }
+    bool already_pause = false, already_restart = false;
+    int32_t target_partition = 2, count = 30;
+    do {
+        write_data_during_split();
+        // pause target partition split
+        if (!already_pause &&
+            check_partition_split_status(table_name, -1, split_status::SPLITTING)) {
+            error_code error = control_partition_split(
+                table_name, split_control_type::PSC_PAUSE, target_partition);
+            ASSERT_EQ(ERR_OK, error);
+            std::cout << "Table(" << table_name << ") pause partition[" << target_partition
+                      << "] split succeed" << std::endl;
+            already_pause = true;
+        }
+        // restart target partition split
+        if (!already_restart && count_during_split >= count &&
+            check_partition_split_status(table_name, target_partition, split_status::PAUSED)) {
+            error_code error = control_partition_split(
+                table_name, split_control_type::PSC_RESTART, target_partition);
+            ASSERT_EQ(ERR_OK, error);
+            std::cout << "Table(" << table_name << ") restart split partition[" << target_partition
+                      << "] succeed" << std::endl;
+            already_restart = true;
+        }
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    } while (!is_split_finished(table_name));
+    std::cout << "Partition split succeed" << std::endl;
 
-//    // succeed
-//    error = ddl_client->app_partition_split(split_table, partition_count * 2);
-//    ASSERT_EQ(dsn::ERR_OK, error);
+    verify_data_after_split();
+    TearDown(table_name);
+}
 
-//    // wait split finish
-//    int try_count = 0;
-//    bool completed = false;
-//    while (!completed) {
-//        int app_id, partition;
-//        std::vector<dsn::partition_configuration> partitions;
-//        error = ddl_client->list_app(split_table, app_id, partition, partitions);
-//        ASSERT_EQ(dsn::ERR_OK, error);
-//        ASSERT_EQ(partition, partition_count * 2);
+TEST_F(partition_split_test, cancel_split)
+{
+    const std::string table_name = "split_table_4";
+    SetUp(table_name);
+    start_partition_split(table_name);
 
-//        completed = true;
-//        for (int i = 0; i < partition; ++i) {
-//            if (partitions[i].ballot == invalid_ballot) {
-//                completed = false;
-//                break;
-//            }
-//        }
-//        if (!completed) {
-//            if ((++try_count) % 3 == 0) {
-//                std::cerr << "try hash_scan during split, try count is " << try_count / 3
-//                          << std::endl;
-//                // hash_scan during this procedure
-//                pegasus::pegasus_client::pegasus_scanner *scanner = nullptr;
-//                pegasus::pegasus_client::scan_options options;
-//                options.batch_size = 1000;
-//                int ret = pg_client->get_scanner(hash_key, "", "", options, scanner);
-//                ASSERT_EQ(ret, 0);
+    // pause partition split
+    bool already_pause = false;
+    error_code error = ERR_OK;
+    do {
+        write_data_during_split();
+        // pause all partition split
+        if (!already_pause &&
+            check_partition_split_status(table_name, -1, split_status::SPLITTING)) {
+            error = control_partition_split(table_name, split_control_type::PSC_PAUSE, -1);
+            ASSERT_EQ(ERR_OK, error);
+            std::cout << "Table(" << table_name << ") pause all partitions split succeed"
+                      << std::endl;
+            already_pause = true;
+        }
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    } while (!check_partition_split_status(table_name, -1, split_status::PAUSED));
 
-//                // verify scan value
-//                std::string hash_temp;
-//                std::string sort_temp;
-//                std::string value_temp;
-//                int scan_count = 0;
-//                while (scanner->next(hash_temp, sort_temp, value_temp) == 0) {
-//                    scan_count++;
-//                    ASSERT_EQ(expected[hash_temp][sort_temp], value_temp);
-//                }
-//                ASSERT_EQ(scan_count, count);
-//                delete scanner;
-//            }
-//            std::cerr << "split is not finished, wait for 1 seconds" << std::endl;
-//            std::this_thread::sleep_for(std::chrono::seconds(1));
-//        } else {
-//            std::cerr << "partition split finished" << std::endl;
-//        }
-//    }
+    // cancel partition split
+    error =
+        control_partition_split(table_name, split_control_type::PSC_CANCEL, -1, partition_count);
+    ASSERT_EQ(ERR_OK, error);
+    std::cout << "Table(" << table_name << ") cancel partitions split succeed" << std::endl;
+    // write data during cancel partition split
+    do {
+        write_data_during_split();
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    } while (!is_split_finished(table_name));
 
-//    // validate data after partition split
-//    for (i = 0; i < count; ++i) {
-//        std::string hash_key = "hashkey";
-//        std::string sort_key = "sortkey" + boost::lexical_cast<std::string>(i);
-//        std::string value;
-//        auto ret = pg_client->get(hash_key, sort_key, value);
-//        ASSERT_EQ(ret, 0);
-//        ASSERT_EQ(expected[hash_key][sort_key], value);
-//    }
-//}
-
-// TEST_F(split, pause_split)
-//{
-//    static std::map<std::string, std::map<std::string, std::string>> expected;
-//    const std::string split_table = "pause_split";
-//    dsn::error_code error;
-//    pegasus::pegasus_client *pg_client =
-//        pegasus::pegasus_client_factory::get_client("mycluster", split_table.c_str());
-
-//    // write data
-//    int count = 1000, i;
-//    for (i = 0; i < count; ++i) {
-//        std::string hash_key = "hashkey" + boost::lexical_cast<std::string>(i);
-//        std::string sort_key = "sortkey" + boost::lexical_cast<std::string>(i);
-//        auto ret = pg_client->set(hash_key, sort_key, "value");
-//        expected[hash_key][sort_key] = "value";
-//        ASSERT_EQ(ret, 0);
-//    }
-
-//    // succeed
-//    error = ddl_client->app_partition_split(split_table, partition_count * 2);
-//    ASSERT_EQ(dsn::ERR_OK, error);
-
-//    // set during this procedure
-//    int counter = 0;
-//    bool completed = false;
-//    while (!completed) {
-//        // pause partition[1]
-//        if (counter == 1) {
-//            // [keyh_1, keys_1, value] should be insert into partition 1
-//            error = ddl_client->control_single_partition_split(split_table, 1, true);
-//            ASSERT_EQ(dsn::ERR_OK, error);
-//        }
-//        if (counter == 30) {
-//            // restart split
-//            error = ddl_client->control_single_partition_split(split_table, 1, false);
-//            ASSERT_EQ(dsn::ERR_OK, error);
-//        }
-
-//        int app_id, partition;
-//        std::vector<dsn::partition_configuration> partitions;
-//        error = ddl_client->list_app(split_table, app_id, partition, partitions);
-//        ASSERT_EQ(dsn::ERR_OK, error);
-//        ASSERT_EQ(partition, partition_count * 2);
-
-//        completed = true;
-//        for (int i = 0; i < partition; ++i) {
-//            if (partitions[i].ballot == invalid_ballot) {
-//                completed = false;
-//                break;
-//            }
-//        }
-
-//        if (!completed) {
-//            int ret;
-//            std::string hash = "keyh_" + boost::lexical_cast<std::string>(counter);
-//            std::string sort = "keys_" + boost::lexical_cast<std::string>(counter);
-
-//            ret = pg_client->set(hash, sort, "value");
-//            if (ret == 0) {
-//                expected[hash][sort] = "value";
-//                std::cerr << "set " << counter << " succeed" << std::endl;
-//                counter++;
-//            } else {
-//                std::cerr << "set " << counter << " failed, error is "
-//                          << pg_client->get_error_string(ret) << std::endl;
-//            }
-//            // ok or timeout
-//            ASSERT_TRUE((ret == 0 || ret == -2));
-
-//            std::cerr << "split is not finished, wait for 1 seconds" << std::endl;
-//            std::this_thread::sleep_for(std::chrono::seconds(1));
-//        } else {
-//            std::cerr << "partition split finished" << std::endl;
-//        }
-//    }
-
-//    // validate data after partition split
-//    for (i = 0; i < count; ++i) {
-//        std::string hash_key = "hashkey" + boost::lexical_cast<std::string>(i);
-//        std::string sort_key = "sortkey" + boost::lexical_cast<std::string>(i);
-//        std::string value;
-//        auto ret = pg_client->get(hash_key, sort_key, value);
-//        ASSERT_EQ(ret, 0);
-//        ASSERT_EQ(expected[hash_key][sort_key], value);
-//    }
-
-//    for (i = 0; i < counter; ++i) {
-//        std::string hash_key = "keyh_" + boost::lexical_cast<std::string>(i);
-//        std::string sort_key = "keys_" + boost::lexical_cast<std::string>(i);
-//        std::string value;
-//        auto ret = pg_client->get(hash_key, sort_key, value);
-//        ASSERT_EQ(ret, 0);
-//        ASSERT_EQ(expected[hash_key][sort_key], value);
-//    }
-//}
-
-// TEST_F(split, cancel_split)
-//{
-//    static std::map<std::string, std::map<std::string, std::string>> expected;
-//    const std::string split_table = "cancel_split";
-//    dsn::error_code error;
-//    pegasus::pegasus_client *pg_client =
-//        pegasus::pegasus_client_factory::get_client("mycluster", split_table.c_str());
-
-//    // write data
-//    int count = 1000, i;
-//    for (i = 0; i < count; ++i) {
-//        std::string hash_key = "hashkey" + boost::lexical_cast<std::string>(i);
-//        std::string sort_key = "sortkey" + boost::lexical_cast<std::string>(i);
-//        auto ret = pg_client->set(hash_key, sort_key, "value");
-//        expected[hash_key][sort_key] = "value";
-//        ASSERT_EQ(ret, 0);
-//    }
-
-//    // succeed
-//    error = ddl_client->app_partition_split(split_table, partition_count * 2);
-//    ASSERT_EQ(dsn::ERR_OK, error);
-
-//    // set during this procedure
-//    int counter = 0;
-//    bool completed = false;
-//    while (!completed) {
-//        // pause partition[0]
-//        if (counter == 1) {
-//            error = ddl_client->control_single_partition_split(split_table, 0, true);
-//            ASSERT_EQ(dsn::ERR_OK, error);
-//            std::cerr << "pause split partition[0]" << std::endl;
-//        }
-
-//        int app_id, partition;
-//        std::vector<dsn::partition_configuration> partitions;
-//        error = ddl_client->list_app(split_table, app_id, partition, partitions);
-//        ASSERT_EQ(dsn::ERR_OK, error);
-//        ASSERT_EQ(partition, partition_count * 2);
-
-//        int finish_count = 0;
-//        for (int i = partition_count; i < partition; ++i) {
-//            if (partitions[i].ballot > invalid_ballot) {
-//                ++finish_count;
-//            }
-//        }
-
-//        if (finish_count == partition_count - 1) {
-//            completed = true;
-//        } else {
-//            std::cerr << (partition_count - finish_count) << " partition not finish split"
-//                      << std::endl;
-//        }
-//        ++counter;
-//        std::this_thread::sleep_for(std::chrono::seconds(1));
-//    }
-
-//    // [0,y,z] will write to partition[3], won't lost
-//    // [5,y,z] will write to partition[5], will be lost after cancel
-//    std::string hash_key1 = boost::lexical_cast<std::string>(0);
-//    std::string hash_key2 = boost::lexical_cast<std::string>(5);
-//    for (i = 0; i < counter; ++i) {
-//        std::string sort_key = boost::lexical_cast<std::string>(i);
-//        auto ret = pg_client->set(hash_key1, sort_key, "value");
-//        ASSERT_EQ(ret, 0);
-//        expected[hash_key1][sort_key] = "value";
-
-//        ret = pg_client->set(hash_key2, sort_key, "value");
-//        ASSERT_EQ(ret, 0);
-//    }
-
-//    // cancel partition split
-//    error = ddl_client->cancel_app_partition_split(split_table, partition_count, true);
-//    ASSERT_EQ(dsn::ERR_OK, error);
-//    std::cerr << "cancel partition split" << std::endl;
-
-//    std::cerr << "sleep for 30 seconds to notify replica server" << std::endl;
-//    std::this_thread::sleep_for(std::chrono::seconds(30));
-
-//    // validate data after partition split
-//    while (i < count) {
-//        std::string hash_key = "hashkey" + boost::lexical_cast<std::string>(i);
-//        std::string sort_key = "sortkey" + boost::lexical_cast<std::string>(i);
-//        std::string value;
-//        auto ret = pg_client->get(hash_key, sort_key, value);
-//        // retry when timeout
-//        if (ret == -2) {
-//            continue;
-//        } else {
-//            ASSERT_EQ(expected[hash_key][sort_key], value);
-//            ++i;
-//        }
-//    }
-
-//    for (i = 0; i < counter; ++i) {
-//        // [0,y,z] won't be lost
-//        std::string sort_key = boost::lexical_cast<std::string>(i);
-//        std::string value1;
-//        auto ret = pg_client->get(hash_key1, sort_key, value1);
-//        ASSERT_EQ(ret, 0);
-//        ASSERT_EQ(expected[hash_key1][sort_key], value1);
-
-//        // [5,y,z] will be lost
-//        std::string value2;
-//        ret = pg_client->get(hash_key2, sort_key, value2);
-//        // not found
-//        ASSERT_EQ(ret, -1001);
-//        ASSERT_EQ("", value2);
-//    }
-//}
+    verify_data_after_split();
+    TearDown(table_name);
+}
