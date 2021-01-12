@@ -1,6 +1,21 @@
-// Copyright (c) 2017, Xiaomi, Inc.  All rights reserved.
-// This source code is licensed under the Apache License Version 2.0, which
-// can be found in the LICENSE file in the root directory of this source tree.
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 
 #pragma once
 
@@ -19,12 +34,12 @@
 
 #include "../shell/commands.h"
 #include "table_stats.h"
-#include "table_hotspot_policy.h"
 
 namespace pegasus {
 namespace server {
 
 class result_writer;
+class hotspot_partition_calculator;
 
 class info_collector
 {
@@ -158,7 +173,7 @@ private:
     dsn::task_tracker _tracker;
     ::dsn::rpc_address _meta_servers;
     std::string _cluster_name;
-    shell_context _shell_context;
+    std::shared_ptr<shell_context> _shell_context;
     uint32_t _app_stat_interval_seconds;
     ::dsn::task_ptr _app_stat_timer_task;
     ::dsn::utils::ex_lock_nr _app_stat_counter_lock;
@@ -177,15 +192,16 @@ private:
     uint32_t _storage_size_fetch_interval_seconds;
     uint32_t _storage_size_retry_wait_seconds;
     uint32_t _storage_size_retry_max_count;
-    std::string _hotspot_detect_algorithm;
     ::dsn::task_ptr _storage_size_stat_timer_task;
     ::dsn::utils::ex_lock_nr _capacity_unit_update_info_lock;
     // mapping 'node address' --> 'last updated timestamp'
     std::map<std::string, string> _capacity_unit_update_info;
-    std::map<std::string, hotspot_calculator *> _hotspot_calculator_store;
-
-    hotspot_calculator *get_hotspot_calculator(const std::string &app_name,
-                                               const int partition_num);
+    // _hotspot_calculator_store is to save hotspot_partition_calculator for each table, a
+    // hotspot_partition_calculator saves historical hotspot data and alert perf_counters of
+    // corresponding table
+    std::map<std::string, std::shared_ptr<hotspot_partition_calculator>> _hotspot_calculator_store;
+    std::shared_ptr<hotspot_partition_calculator>
+    get_hotspot_calculator(const std::string &app_name, const int partition_count);
 };
 
 } // namespace server

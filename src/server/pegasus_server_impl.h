@@ -1,6 +1,21 @@
-// Copyright (c) 2017, Xiaomi, Inc.  All rights reserved.
-// This source code is licensed under the Apache License Version 2.0, which
-// can be found in the LICENSE file in the root directory of this source tree.
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 
 #pragma once
 
@@ -28,6 +43,7 @@ namespace server {
 class meta_store;
 class capacity_unit_calculator;
 class pegasus_server_write;
+class hotkey_collector;
 
 class pegasus_server_impl : public pegasus_read_service
 {
@@ -167,6 +183,7 @@ private:
     friend class manual_compact_service_test;
     friend class pegasus_compression_options_test;
     friend class pegasus_server_impl_test;
+    friend class hotkey_collector_test;
     FRIEND_TEST(pegasus_server_impl_test, default_data_version);
     FRIEND_TEST(pegasus_server_impl_test, test_open_db_with_latest_options);
     FRIEND_TEST(pegasus_server_impl_test, test_open_db_with_app_envs);
@@ -174,6 +191,7 @@ private:
 
     friend class pegasus_manual_compact_service;
     friend class pegasus_write_service;
+    friend class rocksdb_wrapper;
 
     // parse checkpoint directories in the data dir
     // checkpoint directory format is: "checkpoint.{decree}"
@@ -323,6 +341,11 @@ private:
 
     ::dsn::error_code flush_all_family_columns(bool wait);
 
+    void on_detect_hotkey(const dsn::replication::detect_hotkey_request &req,
+                          dsn::replication::detect_hotkey_response &resp) override;
+
+    uint32_t query_data_version() const override;
+
     // return rocksdb::Status::OK() if partition should serve key
     // otherwise return rocksdb::Status::NotFound()
     // used when full scan
@@ -360,6 +383,7 @@ private:
     rocksdb::ColumnFamilyHandle *_data_cf;
     rocksdb::ColumnFamilyHandle *_meta_cf;
     static std::shared_ptr<rocksdb::Cache> _s_block_cache;
+    static std::shared_ptr<rocksdb::WriteBufferManager> _s_write_buffer_manager;
     static std::shared_ptr<rocksdb::RateLimiter> _s_rate_limiter;
     static int64_t _rocksdb_limiter_last_total_through;
     volatile bool _is_open;
@@ -392,6 +416,9 @@ private:
         dsn::replication::ingestion_status::IS_INVALID};
 
     dsn::task_tracker _tracker;
+
+    std::shared_ptr<hotkey_collector> _read_hotkey_collector;
+    std::shared_ptr<hotkey_collector> _write_hotkey_collector;
 
     // perf counters
     ::dsn::perf_counter_wrapper _pfc_get_qps;

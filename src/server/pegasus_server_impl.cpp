@@ -1,6 +1,21 @@
-// Copyright (c) 2017, Xiaomi, Inc.  All rights reserved.
-// This source code is licensed under the Apache License Version 2.0, which
-// can be found in the LICENSE file in the root directory of this source tree.
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 
 #include "pegasus_server_impl.h"
 
@@ -15,6 +30,7 @@
 #include <dsn/utility/string_conv.h>
 #include <dsn/dist/fmt_logging.h>
 #include <dsn/dist/replication/replication.codes.h>
+#include <dsn/utility/flags.h>
 
 #include "base/pegasus_key_schema.h"
 #include "base/pegasus_value_schema.h"
@@ -22,6 +38,7 @@
 #include "capacity_unit_calculator.h"
 #include "pegasus_server_write.h"
 #include "meta_store.h"
+#include "hotkey_collector.h"
 
 using namespace dsn::literals::chrono_literals;
 
@@ -29,6 +46,11 @@ namespace pegasus {
 namespace server {
 
 DEFINE_TASK_CODE(LPC_PEGASUS_SERVER_DELAY, TASK_PRIORITY_COMMON, ::dsn::THREAD_POOL_DEFAULT)
+
+DSN_DEFINE_int32("pegasus.server",
+                 hotkey_analyse_time_interval_s,
+                 10,
+                 "hotkey analyse interval in seconds");
 
 static std::string chkpt_get_dir_name(int64_t decree)
 {
@@ -46,6 +68,7 @@ static bool chkpt_init_from_dir(const char *name, int64_t &decree)
 std::shared_ptr<rocksdb::RateLimiter> pegasus_server_impl::_s_rate_limiter;
 int64_t pegasus_server_impl::_rocksdb_limiter_last_total_through;
 std::shared_ptr<rocksdb::Cache> pegasus_server_impl::_s_block_cache;
+std::shared_ptr<rocksdb::WriteBufferManager> pegasus_server_impl::_s_write_buffer_manager;
 ::dsn::task_ptr pegasus_server_impl::_update_server_rdb_stat;
 ::dsn::perf_counter_wrapper pegasus_server_impl::_pfc_rdb_block_cache_mem_usage;
 ::dsn::perf_counter_wrapper pegasus_server_impl::_pfc_rdb_write_limiter_rate_bytes;
@@ -470,7 +493,9 @@ void pegasus_server_impl::on_multi_get(multi_get_rpc rpc)
                 if (r == 1) {
                     count++;
                     auto &kv = resp.kvs.back();
-                    limiter->add_size(kv.key.length() + kv.value.length());
+                    uint64_t kv_size = kv.key.length() + kv.value.length();
+                    size += kv_size;
+                    limiter->add_size(kv_size);
                 } else if (r == 2) {
                     expire_count++;
                 } else { // r == 3
@@ -533,7 +558,9 @@ void pegasus_server_impl::on_multi_get(multi_get_rpc rpc)
                 if (r == 1) {
                     count++;
                     auto &kv = reverse_kvs.back();
-                    limiter->add_size(kv.key.length() + kv.value.length());
+                    uint64_t kv_size = kv.key.length() + kv.value.length();
+                    size += kv_size;
+                    limiter->add_size(kv_size);
                 } else if (r == 2) {
                     expire_count++;
                 } else { // r == 3
@@ -794,7 +821,7 @@ void pegasus_server_impl::on_sortkey_count(sortkey_count_rpc rpc)
         resp.count = -1;
     }
 
-    _cu_calculator->add_sortkey_count_cu(resp.error);
+    _cu_calculator->add_sortkey_count_cu(resp.error, hash_key);
     _pfc_scan_latency->set(dsn_now_ns() - start_time);
 }
 
@@ -856,7 +883,7 @@ void pegasus_server_impl::on_ttl(ttl_rpc rpc)
         }
     }
 
-    _cu_calculator->add_ttl_cu(resp.error);
+    _cu_calculator->add_ttl_cu(resp.error, key);
 }
 
 void pegasus_server_impl::on_get_scanner(get_scanner_rpc rpc)
@@ -1491,8 +1518,19 @@ void pegasus_server_impl::on_clear_scanner(const int64_t &args) { _context_cache
     });
 
     // initialize cu calculator and write service after server being initialized.
-    _cu_calculator = dsn::make_unique<capacity_unit_calculator>(this);
+    _cu_calculator = dsn::make_unique<capacity_unit_calculator>(
+        this, _read_hotkey_collector, _write_hotkey_collector);
     _server_write = dsn::make_unique<pegasus_server_write>(this, _verbose_log);
+
+    ::dsn::tasking::enqueue_timer(LPC_ANALYZE_HOTKEY,
+                                  &_tracker,
+                                  [this]() { _read_hotkey_collector->analyse_data(); },
+                                  std::chrono::seconds(FLAGS_hotkey_analyse_time_interval_s));
+
+    ::dsn::tasking::enqueue_timer(LPC_ANALYZE_HOTKEY,
+                                  &_tracker,
+                                  [this]() { _write_hotkey_collector->analyse_data(); },
+                                  std::chrono::seconds(FLAGS_hotkey_analyse_time_interval_s));
 
     return ::dsn::ERR_OK;
 }
@@ -2828,6 +2866,32 @@ void pegasus_server_impl::set_ingestion_status(dsn::replication::ingestion_statu
                    dsn::enum_to_string(status));
     _ingestion_status = status;
 }
+
+void pegasus_server_impl::on_detect_hotkey(const dsn::replication::detect_hotkey_request &req,
+                                           dsn::replication::detect_hotkey_response &resp)
+{
+
+    if (dsn_unlikely(req.action != dsn::replication::detect_action::START &&
+                     req.action != dsn::replication::detect_action::STOP &&
+                     req.action != dsn::replication::detect_action::QUERY)) {
+        resp.err = dsn::ERR_INVALID_PARAMETERS;
+        resp.__set_err_hint("invalid detect_action");
+        return;
+    }
+
+    if (dsn_unlikely(req.type != dsn::replication::hotkey_type::READ &&
+                     req.type != dsn::replication::hotkey_type::WRITE)) {
+        resp.err = dsn::ERR_INVALID_PARAMETERS;
+        resp.__set_err_hint("invalid hotkey_type");
+        return;
+    }
+
+    auto collector = req.type == dsn::replication::hotkey_type::READ ? _read_hotkey_collector
+                                                                     : _write_hotkey_collector;
+    collector->handle_rpc(req, resp);
+}
+
+uint32_t pegasus_server_impl::query_data_version() const { return _pegasus_data_version; }
 
 } // namespace server
 } // namespace pegasus
