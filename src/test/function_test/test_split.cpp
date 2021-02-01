@@ -227,8 +227,8 @@ TEST_F(partition_split_test, pause_split)
         // pause target partition split
         if (!already_pause &&
             check_partition_split_status(table_name, -1, split_status::SPLITTING)) {
-            error_code error = control_partition_split(
-                table_name, split_control_type::PSC_PAUSE, target_partition);
+            error_code error =
+                control_partition_split(table_name, split_control_type::PAUSE, target_partition);
             ASSERT_EQ(ERR_OK, error);
             std::cout << "Table(" << table_name << ") pause partition[" << target_partition
                       << "] split succeed" << std::endl;
@@ -237,8 +237,8 @@ TEST_F(partition_split_test, pause_split)
         // restart target partition split
         if (!already_restart && count_during_split >= count &&
             check_partition_split_status(table_name, target_partition, split_status::PAUSED)) {
-            error_code error = control_partition_split(
-                table_name, split_control_type::PSC_RESTART, target_partition);
+            error_code error =
+                control_partition_split(table_name, split_control_type::RESTART, target_partition);
             ASSERT_EQ(ERR_OK, error);
             std::cout << "Table(" << table_name << ") restart split partition[" << target_partition
                       << "] succeed" << std::endl;
@@ -266,7 +266,7 @@ TEST_F(partition_split_test, cancel_split)
         // pause all partition split
         if (!already_pause &&
             check_partition_split_status(table_name, -1, split_status::SPLITTING)) {
-            error = control_partition_split(table_name, split_control_type::PSC_PAUSE, -1);
+            error = control_partition_split(table_name, split_control_type::PAUSE, -1);
             ASSERT_EQ(ERR_OK, error);
             std::cout << "Table(" << table_name << ") pause all partitions split succeed"
                       << std::endl;
@@ -276,8 +276,7 @@ TEST_F(partition_split_test, cancel_split)
     } while (!check_partition_split_status(table_name, -1, split_status::PAUSED));
 
     // cancel partition split
-    error =
-        control_partition_split(table_name, split_control_type::PSC_CANCEL, -1, partition_count);
+    error = control_partition_split(table_name, split_control_type::CANCEL, -1, partition_count);
     ASSERT_EQ(ERR_OK, error);
     std::cout << "Table(" << table_name << ") cancel partitions split succeed" << std::endl;
     // write data during cancel partition split

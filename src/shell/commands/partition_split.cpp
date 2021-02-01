@@ -154,8 +154,7 @@ bool pause_partition_split(command_executor *e, shell_context *sc, arguments arg
         return false;
     }
 
-    auto err_resp =
-        sc->ddl_client->control_partition_split(app_name, split_control_type::PSC_PAUSE, pidx);
+    auto err_resp = sc->ddl_client->pause_partition_split(app_name, pidx);
     dsn::error_s err = err_resp.get_error();
     auto resp = err_resp.get_value();
 
@@ -206,8 +205,7 @@ bool restart_partition_split(command_executor *e, shell_context *sc, arguments a
         return false;
     }
 
-    auto err_resp =
-        sc->ddl_client->control_partition_split(app_name, split_control_type::PSC_RESTART, pidx);
+    auto err_resp = sc->ddl_client->restart_partition_split(app_name, pidx);
     dsn::error_s err = err_resp.get_error();
     auto resp = err_resp.get_value();
 
@@ -259,8 +257,7 @@ bool cancel_partition_split(command_executor *e, shell_context *sc, arguments ar
         return false;
     }
 
-    auto err_resp = sc->ddl_client->control_partition_split(
-        app_name, split_control_type::PSC_CANCEL, -1, old_partition_count);
+    auto err_resp = sc->ddl_client->cancel_partition_split(app_name, old_partition_count);
     dsn::error_s err = err_resp.get_error();
     auto resp = err_resp.get_value();
 
