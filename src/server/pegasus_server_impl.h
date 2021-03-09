@@ -271,7 +271,6 @@ private:
 
     bool compression_str_to_type(const std::string &compression_str,
                                  rocksdb::CompressionType &type);
-
     std::string compression_type_to_str(rocksdb::CompressionType type);
 
     // return finish time recorded in rocksdb
@@ -445,7 +444,6 @@ private:
     ::dsn::perf_counter_wrapper _pfc_rdb_index_and_filter_blocks_mem_usage;
     ::dsn::perf_counter_wrapper _pfc_rdb_memtable_mem_usage;
     ::dsn::perf_counter_wrapper _pfc_rdb_estimate_num_keys;
-
     ::dsn::perf_counter_wrapper _pfc_rdb_bf_seek_negatives;
     ::dsn::perf_counter_wrapper _pfc_rdb_bf_seek_total;
     ::dsn::perf_counter_wrapper _pfc_rdb_bf_point_positive_true;
