@@ -27,7 +27,6 @@
 #include "base/pegasus_utils.h"
 #include "base/pegasus_key_schema.h"
 #include "base/pegasus_value_schema.h"
-#include "base/pegasus_key_schema.h"
 
 namespace pegasus {
 namespace server {
@@ -138,7 +137,6 @@ private:
     std::atomic<uint32_t> _pegasus_data_version;
     std::atomic<uint32_t> _default_ttl;
     std::atomic_bool _enabled; // only process filtering when _enabled == true
-
     std::atomic<int32_t> _partition_index{0};
     std::atomic<int32_t> _partition_version{-1};
     std::atomic_bool _validate_partition_hash{false};
