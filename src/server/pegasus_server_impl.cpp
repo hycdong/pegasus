@@ -2308,6 +2308,7 @@ void pegasus_server_impl::update_app_envs(const std::map<std::string, std::strin
     update_checkpoint_reserve(envs);
     update_slow_query_threshold(envs);
     update_rocksdb_iteration_threshold(envs);
+    update_validate_partition_hash(envs);
     _manual_compact_svc.start_manual_compact_if_needed(envs);
 }
 
@@ -2324,6 +2325,7 @@ void pegasus_server_impl::update_app_envs_before_open_db(
     update_checkpoint_reserve(envs);
     update_slow_query_threshold(envs);
     update_rocksdb_iteration_threshold(envs);
+    update_validate_partition_hash(envs);
     _manual_compact_svc.start_manual_compact_if_needed(envs);
 }
 
@@ -2449,6 +2451,25 @@ void pegasus_server_impl::update_rocksdb_iteration_threshold(
                        _rng_rd_opts.rocksdb_iteration_threshold_time_ms,
                        threshold_ms);
         _rng_rd_opts.rocksdb_iteration_threshold_time_ms = threshold_ms;
+    }
+}
+
+void pegasus_server_impl::update_validate_partition_hash(
+    const std::map<std::string, std::string> &envs)
+{
+    bool new_value = false;
+    auto iter = envs.find(SPLIT_VALIDATE_PARTITION_HASH);
+    if (iter != envs.end()) {
+        if (!dsn::buf2bool(iter->second, new_value)) {
+            derror_replica("{}={} is invalid.", iter->first, iter->second);
+            return;
+        }
+    }
+    if (new_value != _validate_partition_hash) {
+        ddebug_replica(
+            "update '_validate_partition_hash' from {} to {}", _validate_partition_hash, new_value);
+        _validate_partition_hash = new_value;
+        _key_ttl_compaction_filter_factory->SetValidatePartitionHash(_validate_partition_hash);
     }
 }
 

@@ -146,7 +146,7 @@ pegasus_restore_key(const ::dsn::blob &key, std::string &hash_key, std::string &
     }
 }
 
-// calculate hash from rocksdb key.
+// calculate hash from rocksdb key or rocksdb slice
 // TODO(hyc): consider difference between original dsn::blob type and template
 // original function use key.buffer_ptr() to calculate crc64_calc, what's the usage of offset?
 // if there will bring in error???
@@ -173,6 +173,18 @@ inline uint64_t pegasus_key_hash(const T &key)
 inline uint64_t pegasus_hash_key_hash(const ::dsn::blob &hash_key)
 {
     return dsn::utils::crc64_calc(hash_key.data(), hash_key.length(), 0);
+}
+
+// check key should be served this partition
+// Notice: partition_version should be check if is greater than 0 before calling this function
+template <class T>
+inline bool check_pegasus_key_hash(const T &key, int32_t pidx, int32_t partition_version)
+{
+    auto target_pidx = pegasus_key_hash(key) & partition_version;
+    if (dsn_unlikely(target_pidx != pidx)) {
+        return false;
+    }
+    return true;
 }
 
 } // namespace pegasus
