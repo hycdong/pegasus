@@ -169,6 +169,53 @@ public:
         }
     }
 
+    void hash_scan_during_split(int32_t count)
+    {
+        if (count % 3 != 0) {
+            return;
+        }
+
+        pegasus_client::pegasus_scanner *scanner = nullptr;
+        pegasus_client::scan_options options;
+        auto ret = pg_client->get_scanner(
+            dataset_hashkey_prefix + std::to_string(count), "", "", options, scanner);
+        ASSERT_TRUE((ret == PERR_OK || ret == PERR_TIMEOUT));
+        if (ret == PERR_OK) {
+            std::string hash_key;
+            std::string sort_key;
+            std::string expected_value;
+            while (scanner->next(hash_key, sort_key, expected_value) == 0) {
+                ASSERT_EQ(expected[hash_key][sort_key], expected_value);
+            }
+        }
+        delete scanner;
+    }
+
+    void full_scan_after_split()
+    {
+        std::cout << "Start full scan after partition split......" << std::endl;
+        std::vector<pegasus_client::pegasus_scanner *> scanners;
+        pegasus_client::scan_options options;
+        auto ret = pg_client->get_unordered_scanners(10000, options, scanners);
+        ASSERT_EQ(ret, PERR_OK);
+        int32_t count;
+        for (auto i = 0; i < scanners.size(); i++) {
+            std::string hash_key;
+            std::string sort_key;
+            std::string expected_value;
+            pegasus_client::internal_info info;
+            pegasus_client::pegasus_scanner *scanner = scanners[i];
+            while (scanner->next(hash_key, sort_key, expected_value, &info) == 0) {
+                ASSERT_EQ(expected[hash_key][sort_key], expected_value);
+                count++;
+            }
+        }
+        ASSERT_EQ(count, dataset_count);
+        for (auto scanner : scanners) {
+            delete scanner;
+        }
+    }
+
 public:
     std::shared_ptr<replication_ddl_client> ddl_client;
     pegasus_client *pg_client;
@@ -214,9 +261,26 @@ TEST_F(partition_split_test, split_with_read)
     TearDown(table_name);
 }
 
-TEST_F(partition_split_test, pause_split)
+TEST_F(partition_split_test, split_with_scan)
 {
     const std::string table_name = "split_table_3";
+    SetUp(table_name);
+    start_partition_split(table_name);
+    int32_t count = 0;
+    do {
+        hash_scan_during_split(count);
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        ++count;
+    } while (!is_split_finished(table_name));
+    std::cout << "Partition split succeed" << std::endl;
+    verify_data_after_split();
+    full_scan_after_split();
+    TearDown(table_name);
+}
+
+TEST_F(partition_split_test, pause_split)
+{
+    const std::string table_name = "split_table_4";
     SetUp(table_name);
     start_partition_split(table_name);
 
@@ -254,7 +318,7 @@ TEST_F(partition_split_test, pause_split)
 
 TEST_F(partition_split_test, cancel_split)
 {
-    const std::string table_name = "split_table_4";
+    const std::string table_name = "split_table_5";
     SetUp(table_name);
     start_partition_split(table_name);
 
