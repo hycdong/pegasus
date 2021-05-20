@@ -2816,21 +2816,6 @@ void pegasus_server_impl::set_partition_version(int32_t partition_version)
     _key_ttl_compaction_filter_factory->SetPartitionVersion(partition_version);
 }
 
-template <class T>
-rocksdb::Status pegasus_server_impl::check_key_hash_match(const T &key)
-{
-    if (_gpid.get_partition_index() > _partition_version) {
-        return rocksdb::Status::NotFound();
-    }
-
-    uint32_t hash = (uint32_t)pegasus_key_hash(key);
-    if ((hash & _partition_version) != _gpid.get_partition_index()) {
-        return rocksdb::Status::NotFound();
-    }
-
-    return rocksdb::Status::OK();
-}
-
 ::dsn::error_code pegasus_server_impl::flush_all_family_columns(bool wait)
 {
     rocksdb::FlushOptions options;

@@ -274,6 +274,7 @@ TEST_F(partition_split_test, split_with_scan)
     } while (!is_split_finished(table_name));
     std::cout << "Partition split succeed" << std::endl;
     verify_data_after_split();
+    std::this_thread::sleep_for(std::chrono::seconds(30));
     full_scan_after_split();
     TearDown(table_name);
 }

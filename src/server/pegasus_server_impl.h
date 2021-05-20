@@ -350,12 +350,6 @@ private:
 
     uint32_t query_data_version() const override;
 
-    // return rocksdb::Status::OK() if partition should serve key
-    // otherwise return rocksdb::Status::NotFound()
-    // used when full scan
-    template <class T>
-    rocksdb::Status check_key_hash_match(const T &key);
-
 private:
     static const std::chrono::seconds kServerStatUpdateTimeSec;
     static const std::string COMPRESSION_HEADER;
