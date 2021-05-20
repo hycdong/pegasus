@@ -2104,13 +2104,6 @@ pegasus_server_impl::append_key_value_for_scan(std::vector<::dsn::apps::key_valu
         }
     }
 
-    if (need_check_hash && !check_key_hash_match(key).ok()) {
-        if (_verbose_log) {
-            derror("%s: not serve hash key while scan", replica_name());
-        }
-        return 4;
-    }
-
     ::dsn::apps::key_value kv;
 
     // extract raw key
