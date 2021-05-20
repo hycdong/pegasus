@@ -266,13 +266,13 @@ public:
         pegasus_scanner_impl(::dsn::apps::rrdb_client *client,
                              std::vector<uint64_t> &&hash,
                              const scan_options &options,
-                             bool need_check_hash);
+                             bool validate_partition_hash);
         pegasus_scanner_impl(::dsn::apps::rrdb_client *client,
                              std::vector<uint64_t> &&hash,
                              const scan_options &options,
                              const ::dsn::blob &start_key,
                              const ::dsn::blob &stop_key,
-                             bool need_check_hash);
+                             bool validate_partition_hash);
 
     private:
         ::dsn::apps::rrdb_client *_client;
@@ -290,7 +290,7 @@ public:
         mutable ::dsn::zlock _lock;
         std::list<async_scan_next_callback_t> _queue;
         volatile bool _rpc_started;
-        bool _need_check_hash;
+        bool _validate_partition_hash;
 
         void _async_next_internal();
         void _start_scan();

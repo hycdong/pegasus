@@ -42,7 +42,7 @@ struct pegasus_scan_context
                          const std::string &&sort_key_filter_pattern_,
                          int32_t batch_size_,
                          bool no_value_,
-                         bool need_check_hash_)
+                         bool validate_partition_hash_)
         : _stop_holder(std::move(stop_)),
           _hash_key_filter_pattern_holder(std::move(hash_key_filter_pattern_)),
           _sort_key_filter_pattern_holder(std::move(sort_key_filter_pattern_)),
@@ -57,7 +57,7 @@ struct pegasus_scan_context
               _sort_key_filter_pattern_holder.data(), 0, _sort_key_filter_pattern_holder.length()),
           batch_size(batch_size_),
           no_value(no_value_),
-          need_check_hash(need_check_hash_)
+          validate_partition_hash(validate_partition_hash_)
     {
     }
 
@@ -76,7 +76,7 @@ public:
     dsn::blob sort_key_filter_pattern;
     int32_t batch_size;
     bool no_value;
-    bool need_check_hash;
+    bool validate_partition_hash;
 };
 
 class pegasus_context_cache
